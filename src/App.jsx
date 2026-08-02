@@ -766,6 +766,28 @@ function formatOffsetDiff(diffMinutes) {
 }
 
 /* ---------------- Language switcher ---------------- */
+// 全域下拉選單協調機制：修正「國旗浮在選單上方」的顯示問題。
+// 根因：FlagPortal（見下方定義）為了不被灰階濾鏡影響，用 createPortal 把國旗獨立掛到
+// document.body、zIndex 40 顯示。但「切換語言」選單（z-20）跟「添加時區」選單（z-10）
+// 是各自獨立的 state，彼此沒有互斥——如果使用者打開「添加時區」選單後，沒關閉它就再打開
+// 「切換語言」選單，兩個選單會同時存在，「添加時區」清單裡各國旗的 portal（zIndex 40）
+// 就會直接蓋在後開啟、疊在視覺上層的語言選單（zIndex 20）上面，看起來像是「國旗憑空浮在
+// 選單最上層」。用一個簡單的 DOM 自訂事件讓所有下拉選單互斥（打開一個時，其餘全部關閉），
+// 就不會再有兩個選單同時掛著、國旗 portal 穿幫的情況。
+const DROPDOWN_CLOSE_EVENT = 'app:dropdown-open';
+function openDropdownExclusive(id) {
+  window.dispatchEvent(new CustomEvent(DROPDOWN_CLOSE_EVENT, { detail: id }));
+}
+function useExclusiveDropdown(id, isOpen, close) {
+  useEffect(() => {
+    function handler(e) {
+      if (e.detail !== id) close();
+    }
+    window.addEventListener(DROPDOWN_CLOSE_EVENT, handler);
+    return () => window.removeEventListener(DROPDOWN_CLOSE_EVENT, handler);
+  }, [id, close]);
+}
+
 function LangSwitcher({ lang, setLang }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -778,10 +800,16 @@ function LangSwitcher({ lang, setLang }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useExclusiveDropdown('lang', open, () => setOpen(false));
+
   return (
     <div className="relative flex-shrink-0" ref={ref}>
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen(v => {
+          const next = !v;
+          if (next) openDropdownExclusive('lang');
+          return next;
+        })}
         className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-full"
         style={glass({ color: INK })}
       >
@@ -1074,6 +1102,8 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, part2Re
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useExclusiveDropdown('timezone', showMenu, () => { setShowMenu(false); setSubmenuCountry(null); });
+
   const addedTz = new Set(clocks.map(c => c.tz));
   const homeClock = clocks.find(c => c.id === homeTzId) || null;
 
@@ -1136,7 +1166,7 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, part2Re
           ) : (
             <div className="flex items-center gap-2">
               <div className="relative" ref={menuRef}>
-                <button onClick={() => { setShowMenu(v => !v); setSubmenuCountry(null); }}
+                <button onClick={() => { setShowMenu(v => { const next = !v; if (next) openDropdownExclusive('timezone'); return next; }); setSubmenuCountry(null); }}
                   className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg font-medium" style={{ background: ACCENT, color: '#fff' }}>
                   <Plus size={14} /> {t.addTimezone}
                 </button>
