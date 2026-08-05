@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "top.timezzw.twa",
+        "sha256_cert_fingerprints": ["EA:02:04:3E:05:DE:27:30:D3:E4:9A:60:D5:28:06:3C:40:DC:89:60:EA:69:73:23:13:A5:00:AD:24:D2:A6:D6"]
+      }
+    }]
