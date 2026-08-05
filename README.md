@@ -1,6 +1,6 @@
 # 世界時鐘・時間軸地標（countdown-timeline-app）
 
-**Language / 語言 / 言語 / 언어：**
+**語言/ Language / 言語 / 언어：**
 [繁體中文](#繁體中文) | [English](#english) | [日本語](#日本語) | [한국어](#한국어)
 
 ---
