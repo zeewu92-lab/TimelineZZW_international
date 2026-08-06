@@ -7,6 +7,7 @@ import {
   getCurrentUserProviderId, changePassword, deleteAccount,
 } from './lib/auth.js';
 import { loadCloudData, saveCloudData } from './lib/cloudSync.js';
+import UpdateChecker from './UpdateChecker';
 
 const INK = 'var(--ink)';
 const INK_SOFT = 'var(--ink-soft)';
@@ -4250,6 +4251,6 @@ export default function App() {
       )}
       <Watermark />
       {SHOW_TEST_WATERMARK && <TestVersionWatermark />}
-    </>
+    <UpdateChecker /></>
   );
 }
