@@ -21,14 +21,16 @@ const INPUT_BG = 'var(--input-bg)';
 // 系統圓體／Quicksand 不需要額外載入（Quicksand 整個 App 本來就在用），其餘幾款是額外的 Google Fonts，
 // 只在使用者真的打開「自定義」面板、要挑字體時才動態載入，避免拖慢一般開合視窗的速度。
 const NUMBER_FONTS = [
-  { id: 'system', name: '系統圓體', family: "-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Noto Sans TC', sans-serif", googleFont: null },
-  { id: 'quicksand', name: 'Quicksand', family: "'Quicksand', sans-serif", googleFont: null },
+  { id: 'system', name: '默認字體', family: "-apple-system, BlinkMacSystemFont, 'PingFang TC', 'Noto Sans TC', sans-serif", googleFont: null },
+  { id: 'inter', name: '系統圓體', family: "'Inter', sans-serif", googleFont: 'Inter:wght@900' },
   { id: 'orbitron', name: '數位科技', family: "'Orbitron', sans-serif", googleFont: 'Orbitron:wght@700' },
-  { id: 'caveat', name: '手寫風', family: "'Caveat', cursive", googleFont: 'Caveat:wght@700' },
   { id: 'playfair', name: '經典襯線', family: "'Playfair Display', serif", googleFont: 'Playfair+Display:wght@700' },
+  { id: 'monoton', name: '純調線條', family: "'Monoton', sans-serif", googleFont: 'Monoton' },
   // Nabla 是可變字體，不支援一般的 wght 軸，改用它自己的 EDPT（立體深度）／EHLT（高光）軸，
   // 所以額外多帶一個 variationSettings 欄位，渲染時要一併套用，只給 font-family 是看不出立體效果的。
   { id: 'nabla', name: '立體霓虹', family: "'Nabla', system-ui", googleFont: 'Nabla', variationSettings: '"EDPT" 100, "EHLT" 12' },
+  { id: 'foldit', name: '灰色摺紙', family: "'Foldit', sans-serif", googleFont: 'Foldit:wght@700' },
+  { id: 'bungee-shade', name: '彈跳陰影', family: "'Bungee Shade', sans-serif", googleFont: 'Bungee+Shade' },
 ];
 function getNumberFontFamily(fontId) {
   const found = NUMBER_FONTS.find(f => f.id === fontId);
