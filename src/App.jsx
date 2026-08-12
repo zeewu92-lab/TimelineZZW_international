@@ -1,0 +1,5363 @@
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Trash2, ChevronDown, ChevronLeft, X, MapPin, Check, Clock, Globe, Sun, Moon, Pencil, User, LogOut, Mail, Eye, EyeOff, Search, SlidersHorizontal, Share2, Bell, BellOff, Settings } from 'lucide-react';
+import {
+  watchAuthState, signUpWithEmail, signInWithEmail, signInWithGoogle, signInWithApple,
+  sendMagicLink, completeEmailLinkSignInIfNeeded, signOutUser,
+  getCurrentUserProviderId, changePassword, deleteAccount,
+} from './lib/auth.js';
+import { loadCloudData, saveCloudData } from './lib/cloudSync.js';
+
+const INK = 'var(--ink)';
+const INK_SOFT = 'var(--ink-soft)';
+const ACCENT = '#6C7BE0';
+const DANGER = '#FF004A';
+const MINT = '#3FBF9B';
+const CARD_BG = 'var(--card-bg)';
+const CARD_BORDER = '1px solid var(--card-border)';
+const INPUT_BG = 'var(--input-bg)';
+// 時間軸上「事件卡片與卡片之間」統一的垂直間距（過去地標清單內部、過去／未來清單交界處、
+// 未來地標清單內部、搜尋結果清單，全部共用同一個數值），確保不管在哪個區塊看到的間隙都一樣。
+const EVENT_CARD_GAP = 24;
+
+// 「更換數字字體」可選的字體清單：id 存進事件的 numberFont 欄位，family 是實際渲染用的 CSS font-family。
+// 系統圓體／Quicksand 不需要額外載入（Quicksand 整個 App 本來就在用），其餘幾款是額外的 Google Fonts，
+// 只在使用者真的打開「自定義」面板、要挑字體時才動態載入，避免拖慢一般開合視窗的速度。
+const NUMBER_FONTS = [
+  { id: 'inter', name: '系統圓體', family: "'Inter', sans-serif", googleFont: 'Inter:wght@900' },
+  { id: 'orbitron', name: '數位科技', family: "'Orbitron', sans-serif", googleFont: 'Orbitron:wght@700' },
+  { id: 'playfair', name: '經典襯線', family: "'Playfair Display', serif", googleFont: 'Playfair+Display:wght@700' },
+  { id: 'monoton', name: '純調線條', family: "'Monoton', sans-serif", googleFont: 'Monoton' },
+  // Nabla 是可變字體，不支援一般的 wght 軸，改用它自己的 EDPT（立體深度）／EHLT（高光）軸，
+  // 所以額外多帶一個 variationSettings 欄位，渲染時要一併套用，只給 font-family 是看不出立體效果的。
+  { id: 'nabla', name: '立體霓虹', family: "'Nabla', system-ui", googleFont: 'Nabla', variationSettings: '"EDPT" 100, "EHLT" 12' },
+  { id: 'foldit', name: '灰色摺紙', family: "'Foldit', sans-serif", googleFont: 'Foldit:wght@700' },
+  { id: 'bungee-shade', name: '彈跳陰影', family: "'Bungee Shade', sans-serif", googleFont: 'Bungee+Shade' },
+];
+function getNumberFontFamily(fontId) {
+  const found = NUMBER_FONTS.find(f => f.id === fontId);
+  return found ? found.family : NUMBER_FONTS[0].family;
+}
+function getNumberFontVariation(fontId) {
+  const found = NUMBER_FONTS.find(f => f.id === fontId);
+  return (found && found.variationSettings) || 'normal';
+}
+// 動態插入 <link> 載入 Google Font，同一款字體只會插入一次（用 module 層級的 Set 記錄），
+// 避免每次打開「自定義」面板都重複插入 <link> 標籤
+const _loadedFontLinks = new Set();
+function ensureGoogleFontLoaded(googleFont) {
+  if (!googleFont || _loadedFontLinks.has(googleFont) || typeof document === 'undefined') return;
+  _loadedFontLinks.add(googleFont);
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${googleFont}&display=swap`;
+  document.head.appendChild(link);
+}
+
+// ▼▼▼ 臨時測試版浮水印開關 ▼▼▼
+// 之後要移除浮水印時，只需把下面這個常數改成 false，
+// 或直接刪除本檔案中「TestVersionWatermark」這個元件與它在 return 裡的呼叫（<TestVersionWatermark />）即可，不影響其他功能。
+const SHOW_TEST_WATERMARK = false;
+const TEST_WATERMARK_TEXT = '測試版080207';
+// ▲▲▲ 臨時測試版浮水印開關 ▲▲▲
+
+// Apple 登入按鈕開關：目前先隱藏，因為網頁版 Apple 登入需要先在 Apple Developer
+// 網站申請 Service ID / Team ID / Key ID / 私鑰，並填進 Firebase 的 Apple 提供方設定。
+// 等這些都設定好之後，把下面這個常數改成 true 即可重新顯示 Apple 登入按鈕，不用改其他地方。
+const SHOW_APPLE_LOGIN = false;
+
+const LANGS = ['zh-TW', 'en', 'ja', 'ko'];
+const LANG_NAMES = { 'zh-TW': '繁體中文', en: 'English', ja: '日本語', ko: '한국어' };
+const LOCALE_MAP = { 'zh-TW': 'zh-TW', en: 'en-US', ja: 'ja-JP', ko: 'ko-KR' };
+
+// Firestore 不保證讀回資料時，物件（map）欄位的排列順序會跟寫入時完全一致，
+// 直接用 JSON.stringify 比較「本機資料」跟「雲端讀回的資料」很容易因為欄位順序不同
+// 而被誤判成「不一樣」，導致明明內容相同，每次重新打開 App 都跳出合併提示。
+// 這裡改用「先把每個物件的 key 排序後再序列化」的穩定版比較，只看內容本身、不受欄位順序影響。
+// ---- 匯出檔案內容加密（AES-256-GCM，金鑰固定寫在前端）----
+// 注意：這不是「密碼保護」，使用者不需要輸入任何密碼，匯入時也完全無感。
+// 這裡的加密純粹是讓匯出的 .tzzwnb 檔案內容變成看不懂的亂碼，避免被隨手用文字編輯器打開
+// 就看到裡面完整的時區／行程資料。因為金鑰固定寫死在前端程式碼裡，任何看得到原始碼的人
+// 理論上都能反推出金鑰、還原內容——這不是機密性等級的防護，只是防止「隨手一瞥」。
+const BACKUP_FILE_MAGIC = 'TZZWNB1:'; // 檔案內容前綴，用來分辨「新版加密格式」跟「舊版明文 JSON」
+const BACKUP_KEY_MATERIAL = 'timezhaoziwu-backup-v1-8f3c1a9e'; // 固定金鑰來源字串，之後要換金鑰只需改這裡
+
+let backupCryptoKeyPromise = null;
+function getBackupCryptoKey() {
+  if (!backupCryptoKeyPromise) {
+    backupCryptoKeyPromise = (async () => {
+      const rawKey = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(BACKUP_KEY_MATERIAL));
+      return crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    })();
+  }
+  return backupCryptoKeyPromise;
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// 把備份 JSON 字串加密成檔案內容：TZZWNB1: 前綴 + base64(隨機 IV + 密文)
+async function encryptBackupText(jsonText) {
+  const key = await getBackupCryptoKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(jsonText));
+  const combined = new Uint8Array(iv.length + cipherBuf.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(cipherBuf), iv.length);
+  return BACKUP_FILE_MAGIC + bytesToBase64(combined);
+}
+
+// 解密檔案內容還原出備份 JSON 字串；格式不對或解密失敗（例如檔案被竄改）會直接 throw
+async function decryptBackupText(fileText) {
+  const combined = base64ToBytes(fileText.slice(BACKUP_FILE_MAGIC.length));
+  const iv = combined.slice(0, 12);
+  const cipherBytes = combined.slice(12);
+  const key = await getBackupCryptoKey();
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
+  return new TextDecoder().decode(plainBuf);
+}
+
+// 驗證並解析「本機備份 .tzzwnb」的內容是否符合預期格式，回傳 parse 好的物件；格式不對、不是加密格式、
+// 解密失敗、或不是合法 JSON 一律回傳 null。目前只認新版加密格式（必須是 TZZWNB1: 開頭），不再相容
+// 加密功能上線前那些明文 JSON 的舊版備份檔——beta 階段只有內部使用者，沒有相容包袱需要背。
+// 這個函式同時給「匯入備份」按鈕（AuthModal 裡的 parseAndImport）與 File Handling API（作業系統「以 App 開啟」
+// .tzzwnb 檔時觸發的 launchQueue consumer）共用，避免兩邊各寫一份驗證邏輯、之後改格式時容易漏改其中一處。
+async function parseBackupPayload(fileText) {
+  try {
+    if (typeof fileText !== 'string' || !fileText.startsWith(BACKUP_FILE_MAGIC)) return null;
+    const jsonText = await decryptBackupText(fileText);
+    const data = JSON.parse(jsonText);
+    if (!data || typeof data !== 'object' || (!Array.isArray(data.clocks) && !Array.isArray(data.events))) {
+      return null;
+    }
+    return data;
+  } catch (err) {
+    return null;
+  }
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return '[' + value.map(stableStringify).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + stableStringify(value[k])).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+// 判斷目前使用者是否「很可能」位於中國大陸——這裡完全沒有後端／IP 查詢服務可用，
+// 只能靠瀏覽器本身透露的兩個線索做推測，準確度有限（例如使用 VPN 就會失準），
+// 但作為「登入頁面提示」這種輕量用途已經足夠：
+//   1. 系統時區是 Asia/Shanghai 或 Asia/Urumqi（中國大陸僅使用這兩個時區）
+//   2. 瀏覽器語言是 zh-CN（中國大陸用的簡體中文語言代碼；台港澳的中文語言代碼是 zh-TW / zh-HK 等，不會誤判）
+// 只要符合其中一項就視為「大陸用戶」。
+function isLikelyMainlandChinaUser() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz === 'Asia/Shanghai' || tz === 'Asia/Urumqi') return true;
+    const langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || '']);
+    if (langs.some(l => (l || '').toLowerCase() === 'zh-cn')) return true;
+  } catch (err) {
+    // 任何環境不支援 Intl／navigator 的例外情況，一律不擋，避免誤傷正常用戶
+  }
+  return false;
+}
+
+// 依「目前位置」時區（若未設定則退回系統時區）判斷早上／中午／晚上，回傳對應的文字 key 與 emoji
+function getGreetingInfo(date, tz) {
+  let hour;
+  try {
+    const zone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    hour = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: zone, hour: 'numeric', hour12: false }).format(date), 10);
+  } catch (err) {
+    hour = date.getHours();
+  }
+  if (hour >= 5 && hour < 9) return { key: 'greetMorning', emoji: '☀️' };
+  if (hour >= 9 && hour < 12) return { key: 'greetForenoon', emoji: '🌤️' };
+  if (hour >= 12 && hour < 14) return { key: 'greetAfternoon', emoji: '🌤️' };
+  if (hour >= 14 && hour < 18) return { key: 'greetLateAfternoon', emoji: '🌇' };
+  return { key: 'greetEvening', emoji: '🌙' };
+}
+
+/* ================= Beta 邀請碼驗證（Phase 1：純前端，小範圍內測） =================
+ * 之後要接 Cloudflare Worker 時，只需要改寫 verifyInviteCode() 這一個函式的內容，
+ * 讓它改成 fetch 你的 /redeem API，回傳一樣的 { ok, token } 格式即可，
+ * InviteGate 元件與 window.storage 的儲存邏輯完全不用動。
+ *
+ * 開發者如何產生一組邀請碼：
+ * 1. 自己想一個邀請碼字串，例如 "ZZW-BETA-8K2Q"
+ * 2. 在瀏覽器 console 執行以下程式碼算出它的 SHA-256 雜湊值：
+ *    (async()=>{const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ZZW-BETA-8K2Q'.trim().toUpperCase())); console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join(''))})()
+ * 3. 把印出來的雜湊值貼到下面的 VALID_INVITE_HASHES 陣列裡（明碼絕對不要寫進程式碼）
+ * 4. 把邀請碼本身私下給受邀的測試者
+ */
+const INVITE_KEY = 'beta-access-granted-v1';
+const VALID_INVITE_HASHES = [
+  // 'e3b0c44298fc1c14...',  // 範例：每個邀請碼的雜湊值佔一行
+];
+
+async function sha256Hex(text) {
+  const enc = new TextEncoder().encode(text.trim().toUpperCase());
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 統一介面：往後換成 Cloudflare Worker 時，只改這個函式內部即可
+async function verifyInviteCode(code) {
+  if (!code || !code.trim()) return { ok: false };
+  const hash = await sha256Hex(code);
+  return { ok: VALID_INVITE_HASHES.includes(hash) };
+
+  // ---- Phase 2（Cloudflare Worker）替換範例 ----
+  // const res = await fetch('https://your-worker.example.workers.dev/redeem', {
+  //   method: 'POST',
+  //   headers: { 'Content-Type': 'application/json' },
+  //   body: JSON.stringify({ code: code.trim() }),
+  // });
+  // if (!res.ok) return { ok: false };
+  // const data = await res.json();
+  // return { ok: !!data.ok, token: data.token };
+}
+
+const STRINGS = {
+  'zh-TW': {
+    todayIs: d => `今天是 ${d}`, greetMorning: '早上好', greetForenoon: '上午好', greetAfternoon: '中午好', greetLateAfternoon: '下午好', greetEvening: '晚上好',
+    worldClock: '世界時鐘', addTimezone: '添加時區', back: '返回',
+    allAdded: '已加入全部地區', emptyClocks: '尚未加入任何時區，點右上角「添加時區」開始吧。',
+    selectedCount: n => `已選 ${n}`, cancel: '取消', delete: '刪除',
+    longPressHint: '長按可多選，點一下確認刪除的時區', timeline: '時間軸', compact: '精簡', detailed: '詳細',
+    currentLocation: '目前位置', setAsCurrent: '點一下設為目前位置', tapToUnset: '再點一下取消設定',
+    sameAsCurrent: '與目前位置同時', diffHourSuffix: '小時',
+    newLandmark: '新增地標', titleLabel: '標題', titlePlaceholder: '事件名稱，給這件事起個名字',
+    dateLabel: '日期', datePlaceholder: '選擇日期', timeLabel: '時間（選填）', calendarLabel: '曆法參照',
+    repeatLabel: '重複', every: '每', unitYear: '年', unitMonth: '個月',
+    repeatHint: '例如農曆生日、國定紀念日', lunarRepeatFixedHint: '此曆法目前僅支援每年重複一次',
+    iconLabel: '圖示', colorLabel: '路標色', noteLabel: '備註（選填）', notePlaceholder: '想記住的一句話',
+    addToTimeline: '加入時間軸', fillRequired: '請填寫標題與日期',
+    emptyTimeline: '這條時間軸還沒有地標。', emptyTimelineSub: '新增一個吧，不論是生日、旅行，還是任何值得期待的一天。',
+    pastLandmarks: n => `往日地標（${n}）`, youAreHere: '你在這裡',
+    searchPlaceholder: '搜尋地標標題…', noSearchResults: '找不到符合的地標',
+    countdown: '倒數 Countdown', countup: '正數 Countup', today: '就是今天',
+    yearlyBadge: n => (n === 1 ? '每年' : `每${n}年`), monthlyBadge: n => (n === 1 ? '每月' : `每${n}個月`),
+    tomorrow: '明天', yesterday: '昨天', lunarPrefix: '農曆',
+    editLandmark: '編輯地標', saveChanges: '儲存修改', edit: '編輯',
+    deleteLandmarkConfirmTitle: '刪除這個地標？', deleteLandmarkConfirmDesc: title => `如您未進行本機備份，此動作無法復原，確定要刪除「${title}」嗎？`, confirmDeleteLandmark: '確認刪除', cancelDeleteLandmark: '取消操作',
+    notifyButtonLabel: '倒數日提醒', notifyPanelTitle: '倒數日提醒設定',
+    notifyEnableLabel: '啟用系統通知', notifyEnableHint: '需要保持這個網頁／App 開著（背景分頁也可以）才能收到通知',
+    notifyDaysBeforeLabel: '提前幾天提醒我', notifyDaysBeforeUnit: '天',
+    notifyPermissionDenied: '瀏覽器通知權限被拒絕，請到瀏覽器設定裡手動開啟後再試一次',
+    notifyUnsupported: '這個瀏覽器不支援系統通知',
+    notifyTitle: title => `倒數提醒：${title}`,
+    notifyBody: days => `還有 ${days} 天`,
+    birthdayLabel: '生日模式', birthdayHint: '以此日期為出生日，自動計算下一次的生日歲數',
+    careLabel: '關懷模式', careHint: '將圖示與顏色改為素雅的紀念樣式',
+    ageBadge: n => `${n} 歲生日`,
+    inviteTitle: 'Beta 內測邀請碼', inviteSubtitle: '這是尚未公開的測試版本，請輸入開發者提供的邀請碼。',
+    invitePlaceholder: '輸入邀請碼', inviteSubmit: '進入', inviteChecking: '驗證中…',
+    inviteInvalid: '邀請碼不正確，請確認後再試一次。',
+    customIconLabel: '自訂圖示', customIconPlaceholder: '貼上想用的 emoji', customIconAdd: '新增',
+    customIconLimit: '自訂圖示數量已達上限（30 個），請先刪除一些再新增。',
+    account: '帳號', loginToSync: '登入以同步', loggedInAs: e => `已登入：${e}`,
+    mainlandCnBlocked: '此功能暫不向中國大陸地區開放，請聯絡開發者。',
+    backupSectionTitle: '本機備份', backupHint: '無法使用雲端同步時，可以匯出備份檔案自行保存，需要時再匯入還原。',
+    backupExportBtn: '匯出備份', backupImportBtn: '匯入備份',
+    backupImportSuccess: '已還原備份資料。', backupImportError: '備份檔案格式不正確，請確認檔案內容。',
+    email: 'Email', password: '密碼', login: '登入', signup: '註冊',
+    switchToSignup: '還沒有帳號？註冊', switchToLogin: '已有帳號？登入',
+    continueWithGoogle: '使用 Google 繼續', continueWithApple: '使用 Apple 繼續',
+    sendMagicLink: '寄送免密碼登入連結', magicLinkSent: '登入連結已寄出，請到信箱點擊連結完成登入。',
+    orDivider: '或', logout: '登出', close: '關閉', authError: '發生錯誤，請確認帳密後再試一次。',
+    authTimeout: '本功能暫不支援中國大陸地區，請聯繫開發者。App 其他功能不受影響，仍可正常使用。',
+    syncing: '同步中…', synced: '已同步',
+    mergeTitle: '偵測到雲端已有資料', mergeDesc: '這個帳號的雲端資料和這台裝置上的資料不一樣，要怎麼處理？',
+    mergeOptionMerge: '合併兩邊的資料', mergeOptionUseCloud: '以雲端資料為主（覆蓋本機）',
+    mergeOptionUseLocal: '以本機資料為主（覆蓋雲端）',
+    confirmPassword: '確認密碼', passwordMismatch: '兩次輸入的密碼不一致',
+    showPassword: '顯示密碼', hidePassword: '隱藏密碼',
+    loginMethodLabel: '登入方式', loginMethodGoogle: 'Google', loginMethodApple: 'Apple', loginMethodEmail: 'Email 密碼',
+    changePassword: '修改密碼', currentPassword: '目前密碼', newPassword: '新密碼', confirmNewPassword: '確認新密碼',
+    passwordChangeSuccess: '密碼已更新', saveChangesBtn: '儲存',
+    deleteAccount: '註銷帳號', deleteAccountConfirmTitle: '確定要註銷帳號嗎？',
+    deleteAccountConfirmDesc: '這個動作無法復原，帳號與雲端資料都會被永久刪除。', confirmDelete: '永久刪除',
+    landmarkDetail: '地標詳情', originalDate: '設定日期', markerColorLabel: '路標色',
+    customBgLabel: '卡片背景', customBgUpload: '上傳圖片', customBgChange: '更換圖片', customBgRemove: '移除背景',
+    customBgHint: '上傳的圖片會疊在毛玻璃質感底下當背景，不會取代原本的毛玻璃效果。',
+    customBgUploading: '處理圖片中…', customBgError: '圖片讀取失敗，請換一張再試一次。',
+    adjustBgOpacity: '調節遮罩透明度', dragToAdjustOpacity: '滑動以調節遮罩透明度',
+    customizeLabel: '自定義', customFontLabel: '數字字體', customFontComingSoon: '更多字體樣式即將推出',
+    daysLeft: n => `${n} 天後`, daysAgo: n => `${n} 天前`,
+    exportLabel: '匯出成圖片', exportFormatCard: '卡片', exportFormatStory: '限動 (9:16)',
+    exportShareButton: '匯出並分享', exportPreparing: '圖片產生中…', exportError: '匯出失敗，請再試一次。',
+  },
+  en: {
+    todayIs: d => `Today is ${d}`, greetMorning: 'Good morning', greetForenoon: 'Good morning', greetAfternoon: 'Good afternoon', greetLateAfternoon: 'Good afternoon', greetEvening: 'Good evening',
+    worldClock: 'World Clock', addTimezone: 'Add Timezone', back: 'Back',
+    allAdded: 'All regions added', emptyClocks: 'No timezones yet — tap "Add Timezone" to start.',
+    selectedCount: n => `${n} selected`, cancel: 'Cancel', delete: 'Delete',
+    longPressHint: 'Long-press to multi-select, tap to confirm removal', timeline: 'Timeline', compact: 'Compact', detailed: 'Detailed',
+    currentLocation: 'Current location', setAsCurrent: 'Tap to set as current location', tapToUnset: 'Tap again to unset',
+    sameAsCurrent: 'Same time as current location', diffHourSuffix: 'h',
+    newLandmark: 'New Landmark', titleLabel: 'Title', titlePlaceholder: 'Event name — give it a name',
+    dateLabel: 'Date', datePlaceholder: 'Select a date', timeLabel: 'Time (optional)', calendarLabel: 'Calendar system',
+    repeatLabel: 'Repeat', every: 'Every', unitYear: 'year(s)', unitMonth: 'month(s)',
+    repeatHint: 'e.g. lunar birthday, national holiday', lunarRepeatFixedHint: 'This calendar currently supports yearly repeat only',
+    iconLabel: 'Icon', colorLabel: 'Marker color', noteLabel: 'Note (optional)', notePlaceholder: 'Something worth remembering',
+    addToTimeline: 'Add to Timeline', fillRequired: 'Please fill in title and date',
+    emptyTimeline: 'No landmarks on this timeline yet.', emptyTimelineSub: 'Add one — a birthday, a trip, or anything worth looking forward to.',
+    pastLandmarks: n => `Past landmarks (${n})`, youAreHere: 'You are here',
+    searchPlaceholder: 'Search landmarks…', noSearchResults: 'No matching landmarks found',
+    countdown: 'Countdown', countup: 'Countup', today: 'Today',
+    yearlyBadge: n => (n === 1 ? 'Yearly' : `Every ${n} years`), monthlyBadge: n => (n === 1 ? 'Monthly' : `Every ${n} months`),
+    tomorrow: 'Tomorrow', yesterday: 'Yesterday', lunarPrefix: 'Lunar',
+    editLandmark: 'Edit Landmark', saveChanges: 'Save Changes', edit: 'Edit',
+    deleteLandmarkConfirmTitle: 'Delete this landmark?', deleteLandmarkConfirmDesc: title => `Unless you've made a local backup, this cannot be undone. Delete "${title}"?`, confirmDeleteLandmark: 'Confirm Delete', cancelDeleteLandmark: 'Cancel',
+    notifyButtonLabel: 'Countdown reminders', notifyPanelTitle: 'Countdown reminder settings',
+    notifyEnableLabel: 'Enable notifications', notifyEnableHint: 'Keep this page/app open (a background tab is fine) to receive notifications',
+    notifyDaysBeforeLabel: 'Remind me this many days before', notifyDaysBeforeUnit: 'days',
+    notifyPermissionDenied: 'Notification permission was denied — enable it in your browser settings and try again',
+    notifyUnsupported: 'This browser does not support notifications',
+    notifyTitle: title => `Reminder: ${title}`,
+    notifyBody: days => `${days} day${days === 1 ? '' : 's'} left`,
+    birthdayLabel: 'Birthday mode', birthdayHint: "Treat this date as the birth date and auto-calculate the age turned each time",
+    careLabel: 'Memorial mode', careHint: 'Switch icons and colors to a quiet, memorial style',
+    ageBadge: n => `Turning ${n}`,
+    inviteTitle: 'Beta Invite Code', inviteSubtitle: 'This is an unreleased test build — please enter the invite code provided by the developer.',
+    invitePlaceholder: 'Enter invite code', inviteSubmit: 'Enter', inviteChecking: 'Checking…',
+    inviteInvalid: 'Invalid invite code. Please check and try again.',
+    customIconLabel: 'Custom Icons', customIconPlaceholder: 'Paste an emoji', customIconAdd: 'Add',
+    customIconLimit: 'You have reached the limit of 30 custom icons — remove one before adding more.',
+    account: 'Account', loginToSync: 'Log in to sync', loggedInAs: e => `Logged in as ${e}`,
+    mainlandCnBlocked: 'This feature is not currently available in mainland China. Please contact the developer.',
+    backupSectionTitle: 'Local Backup', backupHint: "If cloud sync isn't available, you can export a backup file and import it later to restore your data.",
+    backupExportBtn: 'Export Backup', backupImportBtn: 'Import Backup',
+    backupImportSuccess: 'Backup restored.', backupImportError: 'Invalid backup file. Please check the file and try again.',
+    email: 'Email', password: 'Password', login: 'Log in', signup: 'Sign up',
+    switchToSignup: "Don't have an account? Sign up", switchToLogin: 'Already have an account? Log in',
+    continueWithGoogle: 'Continue with Google', continueWithApple: 'Continue with Apple',
+    sendMagicLink: 'Send sign-in link', magicLinkSent: 'A sign-in link has been sent — check your email to finish logging in.',
+    orDivider: 'or', logout: 'Log out', close: 'Close', authError: 'Something went wrong — please check your details and try again.',
+    authTimeout: 'This feature isn\'t currently supported in mainland China — please contact the developer. Everything else in the app still works normally.',
+    syncing: 'Syncing…', synced: 'Synced',
+    mergeTitle: 'Cloud data found', mergeDesc: 'This account already has cloud data that differs from what is on this device. How would you like to proceed?',
+    mergeOptionMerge: 'Merge both', mergeOptionUseCloud: 'Use cloud data (overwrite this device)',
+    mergeOptionUseLocal: 'Use this device (overwrite cloud)',
+    confirmPassword: 'Confirm password', passwordMismatch: 'Passwords do not match',
+    showPassword: 'Show password', hidePassword: 'Hide password',
+    loginMethodLabel: 'Sign-in method', loginMethodGoogle: 'Google', loginMethodApple: 'Apple', loginMethodEmail: 'Email & password',
+    changePassword: 'Change password', currentPassword: 'Current password', newPassword: 'New password', confirmNewPassword: 'Confirm new password',
+    passwordChangeSuccess: 'Password updated', saveChangesBtn: 'Save',
+    deleteAccount: 'Delete account', deleteAccountConfirmTitle: 'Delete your account?',
+    deleteAccountConfirmDesc: 'This cannot be undone. Your account and cloud data will be permanently deleted.', confirmDelete: 'Delete permanently',
+    landmarkDetail: 'Landmark Details', originalDate: 'Set date', markerColorLabel: 'Marker color',
+    customBgLabel: 'Card Background', customBgUpload: 'Upload Image', customBgChange: 'Change Image', customBgRemove: 'Remove Background',
+    customBgHint: 'The uploaded photo sits behind the frosted-glass look as a backdrop — it does not replace the frosted effect.',
+    customBgUploading: 'Processing image…', customBgError: 'Could not read that image. Please try another one.',
+    adjustBgOpacity: 'Adjust overlay opacity', dragToAdjustOpacity: 'Slide to adjust overlay opacity',
+    customizeLabel: 'Customize', customFontLabel: 'Number Font', customFontComingSoon: 'More font styles coming soon',
+    daysLeft: n => `${n} Days Left`, daysAgo: n => `${n} Days Ago`,
+    exportLabel: 'Export as image', exportFormatCard: 'Card', exportFormatStory: 'Story (9:16)',
+    exportShareButton: 'Export & Share', exportPreparing: 'Preparing image…', exportError: 'Export failed — please try again.',
+  },
+  ja: {
+    todayIs: d => `今日は ${d}`, greetMorning: 'おはようございます', greetForenoon: 'おはようございます', greetAfternoon: 'こんにちは', greetLateAfternoon: 'こんにちは', greetEvening: 'こんばんは',
+    worldClock: '世界時計', addTimezone: 'タイムゾーンを追加', back: '戻る',
+    allAdded: 'すべての地域を追加済み', emptyClocks: 'タイムゾーンがありません。右上の「タイムゾーンを追加」から始めましょう。',
+    selectedCount: n => `${n}件選択`, cancel: 'キャンセル', delete: '削除',
+    longPressHint: '長押しで複数選択、タップで削除を確定', timeline: 'タイムライン', compact: 'シンプル', detailed: '詳細',
+    currentLocation: '現在地', setAsCurrent: 'タップして現在地に設定', tapToUnset: 'もう一度タップで解除',
+    sameAsCurrent: '現在地と同じ時刻', diffHourSuffix: '時間',
+    newLandmark: '新しいランドマーク', titleLabel: 'タイトル', titlePlaceholder: 'イベント名を入力してください',
+    dateLabel: '日付', datePlaceholder: '日付を選択', timeLabel: '時刻（任意）', calendarLabel: '暦法',
+    repeatLabel: '繰り返し', every: '毎', unitYear: '年', unitMonth: 'ヶ月',
+    repeatHint: '例：旧暦の誕生日、記念日', lunarRepeatFixedHint: 'この暦は現在、年1回の繰り返しのみ対応しています',
+    iconLabel: 'アイコン', colorLabel: 'マーカーカラー', noteLabel: 'メモ（任意）', notePlaceholder: '覚えておきたい一言',
+    addToTimeline: 'タイムラインに追加', fillRequired: 'タイトルと日付を入力してください',
+    emptyTimeline: 'まだランドマークがありません。', emptyTimelineSub: '誕生日、旅行など、楽しみな日を追加しましょう。',
+    pastLandmarks: n => `過去のランドマーク（${n}）`, youAreHere: '現在地',
+    searchPlaceholder: 'ランドマークを検索…', noSearchResults: '一致するランドマークが見つかりません',
+    countdown: 'カウントダウン', countup: '経過日数', today: '今日',
+    yearlyBadge: n => (n === 1 ? '毎年' : `${n}年ごと`), monthlyBadge: n => (n === 1 ? '毎月' : `${n}ヶ月ごと`),
+    tomorrow: '明日', yesterday: '昨日', lunarPrefix: '旧暦',
+    editLandmark: 'ランドマークを編集', saveChanges: '変更を保存', edit: '編集',
+    deleteLandmarkConfirmTitle: 'このランドマークを削除しますか？', deleteLandmarkConfirmDesc: title => `ローカルバックアップを取っていない場合、この操作は取り消せません。「${title}」を削除しますか？`, confirmDeleteLandmark: '削除を確認', cancelDeleteLandmark: 'キャンセル',
+    notifyButtonLabel: 'カウントダウン通知', notifyPanelTitle: 'カウントダウン通知の設定',
+    notifyEnableLabel: '通知を有効にする', notifyEnableHint: '通知を受け取るには、このページ／アプリを開いたままにしてください（バックグラウンドタブでも構いません）',
+    notifyDaysBeforeLabel: '何日前に通知するか', notifyDaysBeforeUnit: '日',
+    notifyPermissionDenied: '通知の権限が拒否されています。ブラウザの設定で許可してからもう一度お試しください',
+    notifyUnsupported: 'このブラウザは通知に対応していません',
+    notifyTitle: title => `カウントダウン通知：${title}`,
+    notifyBody: days => `あと${days}日`,
+    birthdayLabel: '誕生日モード', birthdayHint: 'この日付を誕生日として、次に迎える歳を自動計算します',
+    careLabel: '追悼モード', careHint: 'アイコンと色を落ち着いた追悼スタイルに切り替えます',
+    ageBadge: n => `${n}歳の誕生日`,
+    inviteTitle: 'ベータ招待コード', inviteSubtitle: 'これは未公開のテスト版です。開発者から受け取った招待コードを入力してください。',
+    invitePlaceholder: '招待コードを入力', inviteSubmit: '入る', inviteChecking: '確認中…',
+    inviteInvalid: '招待コードが正しくありません。確認してもう一度お試しください。',
+    customIconLabel: 'カスタムアイコン', customIconPlaceholder: '使いたい絵文字を貼り付け', customIconAdd: '追加',
+    customIconLimit: 'カスタムアイコンは30個まで登録できます。追加する前に不要なものを削除してください。',
+    account: 'アカウント', loginToSync: 'ログインして同期', loggedInAs: e => `ログイン中：${e}`,
+    mainlandCnBlocked: 'この機能は現在、中国本土ではご利用いただけません。開発者までご連絡ください。',
+    backupSectionTitle: 'ローカルバックアップ', backupHint: 'クラウド同期が使えない場合は、バックアップファイルを書き出して保存し、必要なときに読み込んで復元できます。',
+    backupExportBtn: 'バックアップを書き出す', backupImportBtn: 'バックアップを読み込む',
+    backupImportSuccess: 'バックアップを復元しました。', backupImportError: 'バックアップファイルの形式が正しくありません。内容をご確認ください。',
+    email: 'メールアドレス', password: 'パスワード', login: 'ログイン', signup: '新規登録',
+    switchToSignup: 'アカウントをお持ちでない方は新規登録', switchToLogin: 'アカウントをお持ちの方はログイン',
+    continueWithGoogle: 'Google で続ける', continueWithApple: 'Apple で続ける',
+    sendMagicLink: 'ログインリンクを送信', magicLinkSent: 'ログインリンクを送信しました。メールを確認してリンクをクリックしてください。',
+    orDivider: 'または', logout: 'ログアウト', close: '閉じる', authError: 'エラーが発生しました。入力内容を確認してもう一度お試しください。',
+    authTimeout: 'この機能は現在、中国本土ではご利用いただけません。開発者までお問い合わせください。他の機能は引き続き通常どおり利用できます。',
+    syncing: '同期中…', synced: '同期済み',
+    mergeTitle: 'クラウドに既存データがあります', mergeDesc: 'このアカウントのクラウドデータが、この端末のデータと異なります。どうしますか？',
+    mergeOptionMerge: '両方をマージ', mergeOptionUseCloud: 'クラウドデータを優先（この端末を上書き）',
+    mergeOptionUseLocal: 'この端末のデータを優先（クラウドを上書き）',
+    confirmPassword: 'パスワード（確認）', passwordMismatch: 'パスワードが一致しません',
+    showPassword: 'パスワードを表示', hidePassword: 'パスワードを隠す',
+    loginMethodLabel: 'ログイン方法', loginMethodGoogle: 'Google', loginMethodApple: 'Apple', loginMethodEmail: 'メール/パスワード',
+    changePassword: 'パスワードを変更', currentPassword: '現在のパスワード', newPassword: '新しいパスワード', confirmNewPassword: '新しいパスワード（確認）',
+    passwordChangeSuccess: 'パスワードを更新しました', saveChangesBtn: '保存',
+    deleteAccount: 'アカウントを削除', deleteAccountConfirmTitle: 'アカウントを削除しますか？',
+    deleteAccountConfirmDesc: 'この操作は取り消せません。アカウントとクラウドデータは完全に削除されます。', confirmDelete: '完全に削除',
+    landmarkDetail: 'ランドマークの詳細', originalDate: '設定した日付', markerColorLabel: 'マーカーカラー',
+    customBgLabel: 'カード背景', customBgUpload: '画像をアップロード', customBgChange: '画像を変更', customBgRemove: '背景を削除',
+    customBgHint: 'アップロードした画像はすりガラス風の質感の下に背景として重なるだけで、元の質感を置き換えるものではありません。',
+    customBgUploading: '画像を処理中…', customBgError: '画像を読み込めませんでした。別の画像でもう一度お試しください。',
+    adjustBgOpacity: 'オーバーレイの透明度を調整', dragToAdjustOpacity: 'スライドしてオーバーレイの透明度を調整',
+    customizeLabel: 'カスタマイズ', customFontLabel: '数字のフォント', customFontComingSoon: 'より多くのフォントは近日公開予定',
+    daysLeft: n => `あと${n}日`, daysAgo: n => `${n}日前`,
+    exportLabel: '画像として書き出す', exportFormatCard: 'カード', exportFormatStory: 'ストーリー (9:16)',
+    exportShareButton: '書き出して共有', exportPreparing: '画像を作成中…', exportError: '書き出しに失敗しました。もう一度お試しください。',
+  },
+  ko: {
+    todayIs: d => `오늘은 ${d}`, greetMorning: '좋은 아침이에요', greetForenoon: '좋은 아침이에요', greetAfternoon: '좋은 오후예요', greetLateAfternoon: '좋은 오후예요', greetEvening: '좋은 저녁이에요',
+    worldClock: '세계 시계', addTimezone: '시간대 추가', back: '뒤로',
+    allAdded: '모든 지역이 추가되었습니다', emptyClocks: '아직 추가된 시간대가 없습니다. 오른쪽 위 "시간대 추가"를 눌러보세요.',
+    selectedCount: n => `${n}개 선택됨`, cancel: '취소', delete: '삭제',
+    longPressHint: '길게 눌러 여러 개 선택, 탭하여 삭제 확정', timeline: '타임라인', compact: '간단히', detailed: '자세히',
+    currentLocation: '현재 위치', setAsCurrent: '탭하여 현재 위치로 설정', tapToUnset: '다시 탭하면 해제',
+    sameAsCurrent: '현재 위치와 같은 시간', diffHourSuffix: '시간',
+    newLandmark: '새 랜드마크', titleLabel: '제목', titlePlaceholder: '이벤트 이름을 지어 주세요',
+    dateLabel: '날짜', datePlaceholder: '날짜 선택', timeLabel: '시간(선택)', calendarLabel: '달력 체계',
+    repeatLabel: '반복', every: '매', unitYear: '년', unitMonth: '개월',
+    repeatHint: '예: 음력 생일, 국경일', lunarRepeatFixedHint: '이 달력은 현재 연 1회 반복만 지원합니다',
+    iconLabel: '아이콘', colorLabel: '마커 색상', noteLabel: '메모(선택)', notePlaceholder: '기억하고 싶은 한마디',
+    addToTimeline: '타임라인에 추가', fillRequired: '제목과 날짜를 입력해 주세요',
+    emptyTimeline: '아직 타임라인에 랜드마크가 없습니다.', emptyTimelineSub: '생일, 여행 등 기대되는 날을 추가해 보세요.',
+    pastLandmarks: n => `지난 랜드마크 (${n})`, youAreHere: '현재 위치',
+    searchPlaceholder: '랜드마크 검색…', noSearchResults: '일치하는 랜드마크가 없습니다',
+    countdown: '카운트다운', countup: '경과일', today: '오늘',
+    yearlyBadge: n => (n === 1 ? '매년' : `${n}년마다`), monthlyBadge: n => (n === 1 ? '매월' : `${n}개월마다`),
+    tomorrow: '내일', yesterday: '어제', lunarPrefix: '음력',
+    editLandmark: '랜드마크 편집', saveChanges: '변경 사항 저장', edit: '편집',
+    deleteLandmarkConfirmTitle: '이 랜드마크를 삭제할까요?', deleteLandmarkConfirmDesc: title => `로컬 백업을 하지 않았다면 이 작업은 되돌릴 수 없습니다. "${title}"을(를) 삭제하시겠습니까?`, confirmDeleteLandmark: '삭제 확인', cancelDeleteLandmark: '취소',
+    notifyButtonLabel: '카운트다운 알림', notifyPanelTitle: '카운트다운 알림 설정',
+    notifyEnableLabel: '알림 사용', notifyEnableHint: '알림을 받으려면 이 페이지/앱을 열어 두어야 합니다（백그라운드 탭도 괜찮습니다）',
+    notifyDaysBeforeLabel: '며칠 전에 알려줄까요', notifyDaysBeforeUnit: '일',
+    notifyPermissionDenied: '알림 권한이 거부되었습니다. 브라우저 설정에서 허용한 뒤 다시 시도해 주세요',
+    notifyUnsupported: '이 브라우저는 알림을 지원하지 않습니다',
+    notifyTitle: title => `카운트다운 알림: ${title}`,
+    notifyBody: days => `${days}일 남음`,
+    birthdayLabel: '생일 모드', birthdayHint: '이 날짜를 생일로 지정해 다음 생일 나이를 자동 계산합니다',
+    careLabel: '추모 모드', careHint: '아이콘과 색상을 차분한 추모 스타일로 바꿉니다',
+    ageBadge: n => `${n}세 생일`,
+    inviteTitle: '베타 초대 코드', inviteSubtitle: '아직 공개되지 않은 테스트 버전입니다. 개발자가 제공한 초대 코드를 입력해 주세요.',
+    invitePlaceholder: '초대 코드 입력', inviteSubmit: '입장', inviteChecking: '확인 중…',
+    inviteInvalid: '초대 코드가 올바르지 않습니다. 확인 후 다시 시도해 주세요.',
+    customIconLabel: '커스텀 아이콘', customIconPlaceholder: '사용하고 싶은 이모지 붙여넣기', customIconAdd: '추가',
+    customIconLimit: '커스텀 아이콘은 최대 30개까지 등록할 수 있습니다. 추가하기 전에 일부를 삭제해 주세요.',
+    account: '계정', loginToSync: '로그인하여 동기화', loggedInAs: e => `로그인됨: ${e}`,
+    mainlandCnBlocked: '이 기능은 현재 중국 본토에서 이용하실 수 없습니다. 개발자에게 문의해 주세요.',
+    backupSectionTitle: '로컬 백업', backupHint: '클라우드 동기화를 사용할 수 없는 경우, 백업 파일을 내보내 보관했다가 필요할 때 가져와서 복원할 수 있습니다.',
+    backupExportBtn: '백업 내보내기', backupImportBtn: '백업 가져오기',
+    backupImportSuccess: '백업을 복원했습니다.', backupImportError: '백업 파일 형식이 올바르지 않습니다. 파일 내용을 확인해 주세요.',
+    email: '이메일', password: '비밀번호', login: '로그인', signup: '회원가입',
+    switchToSignup: '계정이 없으신가요? 회원가입', switchToLogin: '이미 계정이 있으신가요? 로그인',
+    continueWithGoogle: 'Google로 계속하기', continueWithApple: 'Apple로 계속하기',
+    sendMagicLink: '로그인 링크 보내기', magicLinkSent: '로그인 링크를 보냈습니다. 이메일에서 링크를 눌러 로그인을 완료하세요.',
+    orDivider: '또는', logout: '로그아웃', close: '닫기', authError: '오류가 발생했습니다. 입력 정보를 확인한 뒤 다시 시도해 주세요.',
+    authTimeout: '이 기능은 현재 중국 본토에서 지원되지 않습니다. 개발자에게 문의해 주세요. 다른 기능은 정상적으로 계속 사용할 수 있습니다.',
+    syncing: '동기화 중…', synced: '동기화됨',
+    mergeTitle: '클라우드에 기존 데이터가 있습니다', mergeDesc: '이 계정의 클라우드 데이터가 이 기기의 데이터와 다릅니다. 어떻게 처리할까요?',
+    mergeOptionMerge: '양쪽 데이터 합치기', mergeOptionUseCloud: '클라우드 데이터 사용(이 기기 덮어쓰기)',
+    mergeOptionUseLocal: '이 기기 데이터 사용(클라우드 덮어쓰기)',
+    confirmPassword: '비밀번호 확인', passwordMismatch: '비밀번호가 일치하지 않습니다',
+    showPassword: '비밀번호 표시', hidePassword: '비밀번호 숨기기',
+    loginMethodLabel: '로그인 방법', loginMethodGoogle: 'Google', loginMethodApple: 'Apple', loginMethodEmail: '이메일/비밀번호',
+    changePassword: '비밀번호 변경', currentPassword: '현재 비밀번호', newPassword: '새 비밀번호', confirmNewPassword: '새 비밀번호 확인',
+    passwordChangeSuccess: '비밀번호가 변경되었습니다', saveChangesBtn: '저장',
+    deleteAccount: '계정 삭제', deleteAccountConfirmTitle: '계정을 삭제하시겠습니까?',
+    deleteAccountConfirmDesc: '이 작업은 되돌릴 수 없습니다. 계정과 클라우드 데이터가 영구적으로 삭제됩니다.', confirmDelete: '영구 삭제',
+    landmarkDetail: '랜드마크 상세정보', originalDate: '설정한 날짜', markerColorLabel: '마커 색상',
+    customBgLabel: '카드 배경', customBgUpload: '이미지 업로드', customBgChange: '이미지 변경', customBgRemove: '배경 제거',
+    customBgHint: '업로드한 이미지는 유리 질감 아래에 배경으로 깔릴 뿐, 원래의 유리 질감을 대체하지 않습니다.',
+    customBgUploading: '이미지 처리 중…', customBgError: '이미지를 불러오지 못했습니다. 다른 이미지로 다시 시도해 주세요.',
+    adjustBgOpacity: '오버레이 투명도 조절', dragToAdjustOpacity: '밀어서 오버레이 투명도 조절',
+    customizeLabel: '커스터마이즈', customFontLabel: '숫자 폰트', customFontComingSoon: '더 많은 폰트 스타일이 곧 제공됩니다',
+    daysLeft: n => `${n}일 남음`, daysAgo: n => `${n}일 지남`,
+    exportLabel: '이미지로 내보내기', exportFormatCard: '카드', exportFormatStory: '스토리 (9:16)',
+    exportShareButton: '내보내기 및 공유', exportPreparing: '이미지 생성 중…', exportError: '내보내기에 실패했습니다. 다시 시도해 주세요.',
+  },
+};
+
+const COLOR_TAGS = [
+  { id: 'indigo', hex: '#6C7BE0' },
+  { id: 'mint', hex: '#3FBF9B' },
+  { id: 'amber', hex: '#F2A65A' },
+  { id: 'rose', hex: '#E8779C' },
+  { id: 'violet', hex: '#A66CE0' },
+  { id: 'sky', hex: '#4FB4E0' },
+  { id: 'sage', hex: '#7CC576' },
+  { id: 'coral', hex: '#E86C5E' },
+];
+const ICONS = ['⭐', '❤️', '📚', '🎉', '🏅️', '🎂️', '✈️'];
+// 關懷模式（追悼／紀念用途）專用的圖示與顏色：固定用蠟燭、墓碑兩個圖示，
+// 其餘自訂圖示沿用原本「＋」自訂功能；顏色改成三種深淺不一的黑灰色（不用平常那些鮮豔色）
+const CARE_ICONS = ['🕯️', '🪦'];
+const CARE_COLOR_TAGS = [
+  { id: 'care-deep', hex: '#26262B' },
+  { id: 'care-mid', hex: '#5B5B63' },
+  { id: 'care-light', hex: '#96969E' },
+];
+// 母菜單圖示對應的子菜單選項（點擊母菜單展開；若未在子菜單中選擇，事件圖示就用母菜單本身的 emoji）
+const ICON_SUBMENUS = {
+  '❤️': ['💏', '👩\u200d❤️\u200d💋\u200d👩', '👩\u200d❤️\u200d💋\u200d👨'],
+  '🏅️': ['🥇', '🥈', '🥉', '🏆'],
+};
+
+const CAL_OPTIONS = [
+  { id: 'gregory', label: { 'zh-TW': '西曆（不轉換）', en: 'Gregorian (no conversion)', ja: '西暦（変換なし）', ko: '양력(변환 없음)' } },
+  { id: 'chinese', label: { 'zh-TW': '農曆', en: 'Lunar (Chinese)', ja: '旧暦', ko: '음력' } },
+  { id: 'islamic', label: { 'zh-TW': '伊斯蘭曆', en: 'Islamic', ja: 'イスラム暦', ko: '이슬람력' } },
+  { id: 'hebrew', label: { 'zh-TW': '希伯來曆', en: 'Hebrew', ja: 'ヘブライ暦', ko: '히브리력' } },
+  { id: 'buddhist', label: { 'zh-TW': '佛曆', en: 'Buddhist', ja: '仏暦', ko: '불기' } },
+  { id: 'japanese', label: { 'zh-TW': '日本曆', en: 'Japanese', ja: '和暦', ko: '일본력' } },
+];
+const LUNAR_MONTHS = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '臘月'];
+
+// countries grouped -- single-zone countries add directly, multi-zone (US) opens a submenu
+const COUNTRIES = [
+  { id: 'CN', flag: '🇨🇳', name: { 'zh-TW': '中國', en: 'China', ja: '中国', ko: '중국' }, zones: [{ tz: 'Asia/Shanghai' }] },
+  { id: 'JP', flag: '🇯🇵', name: { 'zh-TW': '日本', en: 'Japan', ja: '日本', ko: '일본' }, zones: [{ tz: 'Asia/Tokyo' }] },
+  { id: 'KR', flag: '🇰🇷', name: { 'zh-TW': '韓國', en: 'South Korea', ja: '韓国', ko: '대한민국' }, zones: [{ tz: 'Asia/Seoul' }] },
+  { id: 'SG', flag: '🇸🇬', name: { 'zh-TW': '新加坡', en: 'Singapore', ja: 'シンガポール', ko: '싱가포르' }, zones: [{ tz: 'Asia/Singapore' }] },
+  { id: 'TH', flag: '🇹🇭', name: { 'zh-TW': '泰國', en: 'Thailand', ja: 'タイ', ko: '태국' }, zones: [{ tz: 'Asia/Bangkok' }] },
+  { id: 'MY', flag: '🇲🇾', name: { 'zh-TW': '馬來西亞', en: 'Malaysia', ja: 'マレーシア', ko: '말레이시아' }, zones: [{ tz: 'Asia/Kuala_Lumpur' }] },
+  { id: 'PH', flag: '🇵🇭', name: { 'zh-TW': '菲律賓', en: 'Philippines', ja: 'フィリピン', ko: '필리핀' }, zones: [{ tz: 'Asia/Manila' }] },
+  { id: 'VN', flag: '🇻🇳', name: { 'zh-TW': '越南', en: 'Vietnam', ja: 'ベトナム', ko: '베트남' }, zones: [{ tz: 'Asia/Ho_Chi_Minh' }] },
+  { id: 'AE', flag: '🇦🇪', name: { 'zh-TW': '阿聯', en: 'UAE', ja: 'UAE', ko: 'UAE' }, zones: [{ tz: 'Asia/Dubai' }] },
+  { id: 'IN', flag: '🇮🇳', name: { 'zh-TW': '印度', en: 'India', ja: 'インド', ko: '인도' }, zones: [{ tz: 'Asia/Kolkata' }] },
+  { id: 'ID', flag: '🇮🇩', name: { 'zh-TW': '印尼', en: 'Indonesia', ja: 'インドネシア', ko: '인도네시아' }, zones: [{ tz: 'Asia/Jakarta' }] },
+  { id: 'AU', flag: '🇦🇺', name: { 'zh-TW': '澳洲', en: 'Australia', ja: 'オーストラリア', ko: '호주' }, zones: [{ tz: 'Australia/Sydney' }] },
+  { id: 'NZ', flag: '🇳🇿', name: { 'zh-TW': '紐西蘭', en: 'New Zealand', ja: 'ニュージーランド', ko: '뉴질랜드' }, zones: [{ tz: 'Pacific/Auckland' }] },
+  { id: 'GB', flag: '🇬🇧', name: { 'zh-TW': '英國', en: 'United Kingdom', ja: 'イギリス', ko: '영국' }, zones: [{ tz: 'Europe/London' }] },
+  { id: 'FR', flag: '🇫🇷', name: { 'zh-TW': '法國', en: 'France', ja: 'フランス', ko: '프랑스' }, zones: [{ tz: 'Europe/Paris' }] },
+  { id: 'DE', flag: '🇩🇪', name: { 'zh-TW': '德國', en: 'Germany', ja: 'ドイツ', ko: '독일' }, zones: [{ tz: 'Europe/Berlin' }] },
+  { id: 'IT', flag: '🇮🇹', name: { 'zh-TW': '義大利', en: 'Italy', ja: 'イタリア', ko: '이탈리아' }, zones: [{ tz: 'Europe/Rome' }] },
+  { id: 'ES', flag: '🇪🇸', name: { 'zh-TW': '西班牙', en: 'Spain', ja: 'スペイン', ko: '스페인' }, zones: [{ tz: 'Europe/Madrid' }] },
+  { id: 'RU', flag: '🇷🇺', name: { 'zh-TW': '俄羅斯', en: 'Russia', ja: 'ロシア', ko: '러시아' }, zones: [{ tz: 'Europe/Moscow' }] },
+  { id: 'EG', flag: '🇪🇬', name: { 'zh-TW': '埃及', en: 'Egypt', ja: 'エジプト', ko: '이집트' }, zones: [{ tz: 'Africa/Cairo' }] },
+  { id: 'ZA', flag: '🇿🇦', name: { 'zh-TW': '南非', en: 'South Africa', ja: '南アフリカ', ko: '남아프리카공화국' }, zones: [{ tz: 'Africa/Johannesburg' }] },
+  {
+    id: 'US', flag: '🇺🇸', name: { 'zh-TW': '美國', en: 'United States', ja: 'アメリカ', ko: '미국' },
+    zones: [
+      { tz: 'America/New_York', label: { 'zh-TW': '東岸（紐約）', en: 'Eastern (New York)', ja: '東部（ニューヨーク）', ko: '동부(뉴욕)' } },
+      { tz: 'America/Chicago', label: { 'zh-TW': '中部（芝加哥）', en: 'Central (Chicago)', ja: '中部（シカゴ）', ko: '중부(시카고)' } },
+      { tz: 'America/Denver', label: { 'zh-TW': '山區（丹佛）', en: 'Mountain (Denver)', ja: '山岳部（デンバー）', ko: '산악부(덴버)' } },
+      { tz: 'America/Los_Angeles', label: { 'zh-TW': '西岸（洛杉磯）', en: 'Pacific (Los Angeles)', ja: '西部（ロサンゼルス）', ko: '서부(로스앤젤레스)' } },
+      { tz: 'Pacific/Honolulu', label: { 'zh-TW': '夏威夷', en: 'Hawaii', ja: 'ハワイ', ko: '하와이' } },
+    ],
+  },
+  { id: 'CA', flag: '🇨🇦', name: { 'zh-TW': '加拿大', en: 'Canada', ja: 'カナダ', ko: '캐나다' }, zones: [{ tz: 'America/Toronto' }] },
+  { id: 'MX', flag: '🇲🇽', name: { 'zh-TW': '墨西哥', en: 'Mexico', ja: 'メキシコ', ko: '멕시코' }, zones: [{ tz: 'America/Mexico_City' }] },
+  { id: 'BR', flag: '🇧🇷', name: { 'zh-TW': '巴西', en: 'Brazil', ja: 'ブラジル', ko: '브라질' }, zones: [{ tz: 'America/Sao_Paulo' }] },
+];
+
+function colorHex(id) { return (COLOR_TAGS.find(c => c.id === id) || CARE_COLOR_TAGS.find(c => c.id === id) || COLOR_TAGS[0]).hex; }
+
+// 讀取使用者上傳的圖片檔案，等比縮小到最長邊不超過 maxDim（預設 1000px）並轉成 JPEG dataURL 再回傳，
+// 避免直接把原始大尺寸相片（可能好幾 MB）整包存進 window.storage，讓地標資料越存越肥。
+function resizeImageFile(file, maxDim = 1000, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('read-failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode-failed'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+          else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function combineDateTime(dateStr, timeStr) { return new Date(`${dateStr}T${timeStr || '00:00'}:00`); }
+function addMonths(d, n) { const r = new Date(d); r.setMonth(r.getMonth() + n); return r; }
+function addYears(d, n) { const r = new Date(d); r.setFullYear(r.getFullYear() + n); return r; }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+
+function getCalendarParts(date, calendarId) {
+  try {
+    if (calendarId === 'chinese') {
+      // zh-TW-u-ca-chinese renders month as kanji ("六月") which breaks parseInt.
+      // The calendar:'chinese' option (no era) returns clean numeric month/day
+      // plus relatedYear (the Gregorian year the lunar year overlaps).
+      const dtf = new Intl.DateTimeFormat('en-US', { calendar: 'chinese', year: 'numeric', month: 'numeric', day: 'numeric' });
+      const obj = {};
+      dtf.formatToParts(date).forEach(p => (obj[p.type] = p.value));
+      if (obj.relatedYear && !obj.year) obj.year = obj.relatedYear;
+      return obj;
+    }
+    const dtf = new Intl.DateTimeFormat(`zh-TW-u-ca-${calendarId}`, { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' });
+    const obj = {};
+    dtf.formatToParts(date).forEach(p => (obj[p.type] = p.value));
+    return obj;
+  } catch (e) { return null; }
+}
+const GANZHI_STEMS = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+const GANZHI_BRANCHES = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+function getGanZhi(relatedYear) {
+  // 1984 = 甲子年 is the standard reference point for the 60-year sexagenary cycle.
+  const stemIdx = (((relatedYear - 4) % 10) + 10) % 10;
+  const branchIdx = (((relatedYear - 4) % 12) + 12) % 12;
+  return GANZHI_STEMS[stemIdx] + GANZHI_BRANCHES[branchIdx];
+}
+function chineseDayName(day) {
+  const num = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  if (day === 10) return '初十';
+  if (day === 20) return '二十';
+  if (day === 30) return '三十';
+  if (day < 10) return '初' + num[day];
+  if (day < 20) return '十' + num[day - 10];
+  return '廿' + num[day - 20];
+}
+// 將 Intl 傳回的長格式月份名稱（例如「六月」「閏六月」「冬月」）拆解成數字月份＋是否為閏月，
+// 供非中文語系需要用數字呈現月份時使用，同時保留閏月資訊（原本用數字月份反查 LUNAR_MONTHS 的做法
+// 會把「6bis」這種閏月數字直接當成一般的 6 月處理，導致閏月資訊完全遺失）。
+function chineseMonthLabelToNumeric(label) {
+  const isLeap = label.startsWith('閏');
+  const bare = isLeap ? label.slice(1) : label;
+  const idx = LUNAR_MONTHS.indexOf(bare);
+  return { num: idx === -1 ? null : idx + 1, isLeap };
+}
+function formatAltCalendar(date, calendarId, lang, t) {
+  if (!calendarId || calendarId === 'gregory') return '';
+  if (calendarId === 'chinese') {
+    // 直接使用 Intl 長格式月份名稱（chineseMonthInfo），而不是數字曆法欄位，
+    // 這樣「正月」～「臘月」與閏月（例如「閏六月」）才能被正確辨識與顯示。
+    const info = chineseMonthInfo(date);
+    if (!info) return '';
+    const ganzhi = getGanZhi(info.year);
+    if (lang === 'zh-TW') return `${t.lunarPrefix}${ganzhi}年・${info.month}${chineseDayName(info.day)}`;
+    const { num, isLeap } = chineseMonthLabelToNumeric(info.month);
+    const leapMark = { ja: '閏', ko: '윤' }[lang] || 'leap ';
+    const prefix = isLeap ? leapMark : '';
+    if (lang === 'ja') return `${t.lunarPrefix}${ganzhi}年 ${prefix}${num}/${info.day}`;
+    if (lang === 'ko') return `${t.lunarPrefix} ${ganzhi}년 ${prefix}${num}/${info.day}`;
+    return `${t.lunarPrefix} ${ganzhi} Year ${prefix}${num}/${info.day}`;
+  }
+  const parts = getCalendarParts(date, calendarId);
+  if (!parts) return '';
+  const m = parseInt(parts.month), d = parseInt(parts.day);
+  const calLabel = (CAL_OPTIONS.find(c => c.id === calendarId) || {}).label || {};
+  return `${calLabel[lang] || calendarId} ${parts.year}/${m}/${d}`;
+}
+function findNextCalendarMatch(calendarId, targetMonth, targetDay, fromDate, maxDays = 400) {
+  for (let i = 0; i < maxDays; i++) {
+    const d = addDays(fromDate, i);
+    const parts = getCalendarParts(d, calendarId);
+    if (parts && parseInt(parts.month) === targetMonth && parseInt(parts.day) === targetDay) return d;
+  }
+  return null;
+}
+
+/* ================= 曆法反向換算（曆法日期 → 西曆日期） =================
+ * 用途：讓使用者「先選曆法，再選該曆法對應的日期」，而不是只能先選西曆日期再轉換。
+ * 技術作法：瀏覽器的 Intl API 只提供「西曆 → 各曆法」的單向換算（forward-only），
+ * 沒有內建「各曆法 → 西曆」的反向函式。伊斯蘭曆、希伯來曆、農曆都是陰曆／陰陽合曆，
+ * 月份長度不固定（29 或 30 天），也沒有簡單公式可以直接反推，
+ * 所以這裡採用「估算起點 + 逐日掃描比對」的方式：先用平均曆年長度估出一個大概的西曆起點，
+ * 再一天一天呼叫 Intl 的正向換算比對，直到找到完全吻合年／月／日為止。
+ * 佛曆、日本曆的月、日結構其實跟西曆完全相同（只有年份／年號不同），所以不需要掃描，直接位移年份即可。
+ */
+function calNumericParts(date, calendarId) {
+  try {
+    const dtf = new Intl.DateTimeFormat('zh-TW-u-ca-' + calendarId, { year: 'numeric', month: 'numeric', day: 'numeric' });
+    const o = {};
+    dtf.formatToParts(date).forEach(p => (o[p.type] = p.value));
+    return { year: parseInt(o.year), month: parseInt(o.month), day: parseInt(o.day) };
+  } catch (e) { return null; }
+}
+// 中曆的月份名稱（「正月」～「臘月」），閏月則在對應月份名稱前加「閏」字。
+// 農曆月份數字化＋是否為閏月：瀏覽器對 zh-TW-u-ca-chinese「長格式」月份名稱（原本應該直接輸出「正月」「閏六月」這類傳統名稱）
+// 的 ICU 資料支援度不一，某些瀏覽器／作業系統版本只會退化輸出「M06」這種通用格式代號，不是真正的中文月份名稱。
+// 為了不受瀏覽器支援度影響，改成一律用「數字曆法欄位」（calendar:'chinese', month:'numeric'）取得月份數字，
+// 閏月時該欄位的值會多帶一個「bis」字尾（例如「6bis」），再靠這個數字＋閏月旗標自己對照 LUNAR_MONTHS 組出月份名稱。
+function parseChineseNumericMonth(monthStr) {
+  const isLeap = /bis$/i.test(monthStr);
+  const num = parseInt(monthStr, 10);
+  return { num: Number.isNaN(num) ? null : num, isLeap };
+}
+function chineseMonthLabel(monthNum, isLeap) {
+  const base = LUNAR_MONTHS[monthNum - 1] || `${monthNum}月`;
+  return isLeap ? `閏${base}` : base;
+}
+function chineseMonthInfo(date) {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', { calendar: 'chinese', year: 'numeric', month: 'numeric', day: 'numeric' });
+    const o = {};
+    dtf.formatToParts(date).forEach(p => (o[p.type] = p.value));
+    const { num, isLeap } = parseChineseNumericMonth(o.month || '');
+    if (num == null) return null;
+    return { year: parseInt(o.relatedYear || o.year), month: chineseMonthLabel(num, isLeap), day: parseInt(o.day) };
+  } catch (e) { return null; }
+}
+// 列出某個農曆年份中，依時間順序排列的所有月份（含閏月），每個月附上西曆起始日與該月天數
+function buildChineseYearMonths(lunarYear) {
+  let d = new Date(lunarYear - 1, 10, 1); // 從前一年 11 月初開始掃描，確保涵蓋農曆新年最早／最晚的可能日期與最長的閏年天數
+  const months = [];
+  let started = false;
+  for (let i = 0; i < 480; i++) {
+    const info = chineseMonthInfo(d);
+    if (info && info.year === lunarYear) {
+      started = true;
+      const last = months[months.length - 1];
+      if (!last || last.label !== info.month) months.push({ label: info.month, start: new Date(d), days: 1 });
+      else last.days += 1;
+    } else if (started) {
+      break;
+    }
+    d = addDays(d, 1);
+  }
+  return months;
+}
+function chineseCalendarToGregorian(lunarYear, monthLabel, day) {
+  const months = buildChineseYearMonths(lunarYear);
+  const m = months.find(x => x.label === monthLabel);
+  if (!m) return null;
+  return addDays(m.start, Math.min(Math.max(day, 1), m.days) - 1);
+}
+// 伊斯蘭曆、希伯來曆：用平均曆年長度粗估搜尋起點，再逐日掃描比對
+const CAL_EPOCH_GUESS = {
+  islamic: (y) => Math.floor(622 + ((y - 1) * 354.36667) / 365.2425),
+  hebrew: (y) => y - 3760,
+};
+function calendarDateToGregorian(calendarId, year, month, day) {
+  if (calendarId === 'buddhist') return new Date(year - 543, month - 1, day); // 佛曆：純粹年份位移 543 年，月、日結構與西曆相同
+  if (calendarId === 'japanese') return new Date(year, month - 1, day); // 月、日結構與西曆相同，年份由呼叫端先轉換成西曆年再傳入
+  if (calendarId === 'chinese') return null; // 農曆請改用 chineseCalendarToGregorian
+  const guessFn = CAL_EPOCH_GUESS[calendarId];
+  if (!guessFn) return null;
+  let d = new Date(guessFn(year), 0, 1);
+  d = addDays(d, -60);
+  for (let i = 0; i < 800; i++) {
+    const p = calNumericParts(d, calendarId);
+    if (p && p.year === year && p.month === month && p.day === day) return d;
+    d = addDays(d, 1);
+  }
+  return null;
+}
+function getCalendarMonthCount(calendarId, year) {
+  if (calendarId === 'hebrew') return calendarDateToGregorian('hebrew', year, 13, 1) ? 13 : 12;
+  return 12;
+}
+function getCalendarMonthDays(calendarId, year, month) {
+  if (calendarId === 'buddhist' || calendarId === 'japanese') {
+    const gYear = calendarId === 'buddhist' ? year - 543 : year;
+    return new Date(gYear, month, 0).getDate();
+  }
+  const start = calendarDateToGregorian(calendarId, year, month, 1);
+  if (!start) return 30;
+  for (let len = 25; len <= 31; len++) {
+    const p = calNumericParts(addDays(start, len), calendarId);
+    if (!p || p.month !== month || p.year !== year) return len;
+  }
+  return 30;
+}
+// 日本曆年號對照表（現代五個年號）；較早的年號因數量龐大且邊界日期換算複雜，暫不支援，
+// 選擇年號時一律視為由 1 月 1 日開始，年號交替當年的極少數邊界日期換算可能會有些微誤差。
+const JP_ERAS = [
+  { id: 'meiji', label: '明治', startYear: 1868 },
+  { id: 'taisho', label: '大正', startYear: 1912 },
+  { id: 'showa', label: '昭和', startYear: 1926 },
+  { id: 'heisei', label: '平成', startYear: 1989 },
+  { id: 'reiwa', label: '令和', startYear: 2019 },
+];
+function japaneseEraToGregorianYear(eraId, year) {
+  const e = JP_ERAS.find(x => x.id === eraId) || JP_ERAS[JP_ERAS.length - 1];
+  return e.startYear + year - 1;
+}
+function getJapaneseEra(date) {
+  try {
+    const dtf = new Intl.DateTimeFormat('zh-TW-u-ca-japanese', { year: 'numeric', era: 'short' });
+    const o = {};
+    dtf.formatToParts(date).forEach(p => (o[p.type] = p.value));
+    const found = JP_ERAS.find(x => x.label === o.era) || JP_ERAS[JP_ERAS.length - 1];
+    return { id: found.id, year: parseInt(o.year) || 1 };
+  } catch (e) { return { id: 'reiwa', year: 1 }; }
+}
+function japaneseEraYearMax(eraId) {
+  const idx = JP_ERAS.findIndex(e => e.id === eraId);
+  if (idx === -1) return 60;
+  if (idx === JP_ERAS.length - 1) return new Date().getFullYear() - JP_ERAS[idx].startYear + 15;
+  return JP_ERAS[idx + 1].startYear - JP_ERAS[idx].startYear + 1;
+}
+function isoDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function getEffectiveDate(ev, now) {
+  const orig = combineDateTime(ev.date, ev.time);
+  if (!ev.repeat) return orig;
+  const lunarLocked = ev.repeatUnit === 'year' && ev.calendar && ev.calendar !== 'gregory';
+  const n = lunarLocked ? 1 : Math.max(1, ev.repeatInterval || 1);
+
+  if (ev.repeatUnit === 'month') {
+    let cand = new Date(orig);
+    while (cand.getTime() < now.getTime()) cand = addMonths(cand, n);
+    return cand;
+  }
+  if (!ev.calendar || ev.calendar === 'gregory') {
+    let cand = new Date(orig);
+    while (cand.getTime() < now.getTime()) cand = addYears(cand, n);
+    return cand;
+  }
+  const parts = getCalendarParts(orig, ev.calendar);
+  if (!parts) return orig;
+  const found = findNextCalendarMatch(ev.calendar, parseInt(parts.month), parseInt(parts.day), now, 400);
+  if (!found) return orig;
+  found.setHours(orig.getHours(), orig.getMinutes(), 0, 0);
+  return found;
+}
+const SELECT_STYLE = { border: CARD_BORDER, background: INPUT_BG, color: INK };
+const SELECT_CLASS = 'px-2 py-2 rounded-lg text-sm outline-none flex-1 min-w-0';
+/* 「先選曆法、再選對應日期」的日期選擇器：依所選曆法顯示年／月／日下拉選單（日本曆額外顯示年號），
+ * 選擇結果會即時換算成西曆日期字串回傳給上層（外部仍以西曆 yyyy-mm-dd 儲存事件日期，其餘功能不受影響）。 */
+function CalendarDatePicker({ calendarId, isoDate, onChange, syncKey, lang, t }) {
+  const [era, setEra] = useState('reiwa');
+  const [year, setYear] = useState(null);
+  const [yearText, setYearText] = useState(''); // 年份輸入框的顯示文字，與 year 分開管理，讓使用者可以把數字整個刪空後再重新輸入
+  const [month, setMonth] = useState(null); // 農曆為月份名稱字串，其餘曆法為數字
+  const [day, setDay] = useState(null);
+  const ready = useRef(false);
+  const yearDebounceRef = useRef(null); // 伊斯蘭曆／希伯來曆／農曆換算年份時需要逐日掃描比對，運算量較大，
+  // 若每打一個數字就立即觸發換算會造成打字卡頓，所以改成停止輸入一小段時間後才真正換算
+
+  useEffect(() => () => { if (yearDebounceRef.current) clearTimeout(yearDebounceRef.current); }, []);
+
+  // year 由外部（切換曆法、切換年號、點選快速選單）變動時，同步更新輸入框顯示文字，這些地方會各自明確呼叫 setYearText；
+  // 手動輸入時則完全交給輸入框自己的 onChange 管理文字，兩邊不會互相搶著更新，才不會讓打字時卡頓、跳字
+
+  // 切換曆法或重新開啟表單時，依目前的西曆日期（或今天）反推曆法年月日，作為選單初始值
+  useEffect(() => {
+    ready.current = false;
+    if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); yearDebounceRef.current = null; }
+    const base = isoDate ? new Date(isoDate + 'T00:00:00') : new Date();
+    if (calendarId === 'chinese') {
+      const info = chineseMonthInfo(base);
+      if (info) { setYear(info.year); setYearText(String(info.year)); setMonth(info.month); setDay(info.day); }
+    } else if (calendarId === 'japanese') {
+      const p = calNumericParts(base, 'japanese');
+      const e = getJapaneseEra(base);
+      if (p && e) { setEra(e.id); setYear(e.year); setYearText(String(e.year)); setMonth(p.month); setDay(p.day); }
+    } else {
+      const p = calNumericParts(base, calendarId);
+      if (p) { setYear(p.year); setYearText(String(p.year)); setMonth(p.month); setDay(p.day); }
+    }
+    requestAnimationFrame(() => { ready.current = true; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarId, syncKey]);
+
+  // 年、月、日任一項變動時，換算成西曆日期回傳給上層（跳過初始化那一輪，避免多餘的更新）
+  useEffect(() => {
+    if (!ready.current || year == null || month == null || day == null) return;
+    let g = null;
+    if (calendarId === 'chinese') g = chineseCalendarToGregorian(year, month, day);
+    else if (calendarId === 'japanese') g = calendarDateToGregorian('japanese', japaneseEraToGregorianYear(era, year), month, day);
+    else g = calendarDateToGregorian(calendarId, year, month, day);
+    if (g) onChange(isoDateStr(g));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, era, month, day]);
+
+  if (year == null || month == null || day == null) return null;
+
+  const isChinese = calendarId === 'chinese';
+  const chineseMonths = isChinese ? buildChineseYearMonths(year) : null;
+  const gYearForDays = calendarId === 'japanese' ? japaneseEraToGregorianYear(era, year) : year;
+  const monthCount = calendarId === 'hebrew' ? getCalendarMonthCount('hebrew', year) : 12;
+  const dayCount = isChinese
+    ? ((chineseMonths.find(m => m.label === month) || {}).days || 30)
+    : getCalendarMonthDays(calendarId, gYearForDays, month);
+  const yearBase = isChinese ? year : (calNumericParts(new Date(), calendarId) || { year }).year;
+  const yearRangeMin = calendarId === 'japanese' ? 1 : (yearBase - 100);
+  const yearRangeMax = calendarId === 'japanese' ? japaneseEraYearMax(era) : (yearBase + 30);
+  const yearOptionsSet = new Set();
+  for (let y = yearRangeMax; y >= yearRangeMin; y--) yearOptionsSet.add(y);
+  yearOptionsSet.add(year); // 確保目前的年份一定在清單中，避免使用者手動輸入超出常見範圍的年份時，選單定位不到目前的值
+  const yearOptions = Array.from(yearOptionsSet).sort((a, b) => b - a);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-1.5">
+        {calendarId === 'japanese' && (
+          <select
+            value={era}
+            onChange={e => {
+              const nextEra = e.target.value;
+              const maxY = japaneseEraYearMax(nextEra);
+              const clamped = Math.min(year || 1, maxY);
+              if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); yearDebounceRef.current = null; }
+              setEra(nextEra);
+              setYear(clamped);
+              setYearText(String(clamped));
+            }}
+            className={SELECT_CLASS} style={SELECT_STYLE}
+          >
+            {JP_ERAS.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+          </select>
+        )}
+        <input
+          type="number"
+          inputMode="numeric"
+          value={yearText}
+          onChange={e => {
+            const raw = e.target.value;
+            setYearText(raw); // 只更新輸入框自己的顯示文字，不會被其他地方的同步邏輯覆蓋，打字/刪除不會卡頓
+            if (yearDebounceRef.current) clearTimeout(yearDebounceRef.current);
+            if (raw === '' || raw === '-') return; // 使用者正在清空輸入框或準備輸入負數，先不換算，避免中途被當成 NaN
+            const v = parseInt(raw, 10);
+            if (Number.isNaN(v)) return;
+            // 日本曆的「年」是年號內的年份，範圍有限；其餘曆法的年份原則上不特別限制，讓使用者可直接手動鍵入任何年份
+            const clamped = calendarId === 'japanese' ? Math.min(Math.max(v, 1), japaneseEraYearMax(era)) : v;
+            // 伊斯蘭曆／希伯來曆／農曆的換算需要逐日掃描比對，延遲一小段時間再真正觸發，避免每敲一個數字就卡一下
+            yearDebounceRef.current = setTimeout(() => setYear(clamped), 220);
+          }}
+          onBlur={() => {
+            if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); yearDebounceRef.current = null; }
+            // 使用者把輸入框留空或輸入無效內容就離開時，還原成目前生效中的年份，避免留下空白欄位
+            if (yearText === '' || Number.isNaN(parseInt(yearText, 10))) { setYearText(String(year)); return; }
+            // 離開欄位時立即把還沒套用的數值套用，不用等延遲時間跑完
+            const v = parseInt(yearText, 10);
+            setYear(calendarId === 'japanese' ? Math.min(Math.max(v, 1), japaneseEraYearMax(era)) : v);
+          }}
+          className={SELECT_CLASS} style={SELECT_STYLE}
+        />
+        {/* 快速選單：跟月份／日期選單一樣是普通原生 <select>，一定會顯示出瀏覽器原生的下拉箭頭，不會有箭頭消失的問題。
+            為了不要跟左邊的輸入框重複顯示同一組數字，這裡把「目前被選中的那個年份」的選項文字故意留空，
+            所以收合狀態只會看到一個空白按鈕＋原生箭頭；點開清單時，其餘年份仍會正常顯示數字可以選。 */}
+        <select
+          value={year}
+          onChange={e => {
+            const v = parseInt(e.target.value, 10);
+            if (Number.isNaN(v)) return;
+            const clamped = calendarId === 'japanese' ? Math.min(Math.max(v, 1), japaneseEraYearMax(era)) : v;
+            if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); yearDebounceRef.current = null; }
+            setYear(clamped);
+            setYearText(String(clamped));
+          }}
+          aria-label={t.yearPickerLabel || (lang === 'en' ? 'Pick year' : '選擇年份')}
+          className="flex-shrink-0 w-8 py-2 rounded-lg text-sm outline-none text-center"
+          style={SELECT_STYLE}
+        >
+          {yearOptions.map(y => <option key={y} value={y}>{y === year ? '' : y}</option>)}
+        </select>
+        <select
+          value={month}
+          onChange={e => {
+            const val = isChinese ? e.target.value : parseInt(e.target.value);
+            setMonth(val);
+            setDay(1);
+          }}
+          className={SELECT_CLASS} style={SELECT_STYLE}
+        >
+          {isChinese
+            ? chineseMonths.map(m => <option key={m.label} value={m.label}>{m.label}</option>)
+            : Array.from({ length: monthCount }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select
+          value={day}
+          onChange={e => setDay(parseInt(e.target.value))}
+          className={SELECT_CLASS} style={SELECT_STYLE}
+        >
+          {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => (
+            <option key={d} value={d}>{isChinese ? chineseDayName(d) : d}</option>
+          ))}
+        </select>
+      </div>
+      {isoDate && (
+        <p className="text-xs px-1" style={{ color: ACCENT }}>
+          → {new Date(isoDate + 'T00:00:00').toLocaleDateString(LOCALE_MAP[lang] || 'zh-TW')}
+        </p>
+      )}
+    </div>
+  );
+}
+function glass(extra = {}) { return { background: CARD_BG, border: CARD_BORDER, boxShadow: '0 2px 10px rgba(35,39,51,0.05)', ...extra }; }
+// 新增地標表單「選擇事件圖示」的選中提示：統一改成方形毛玻璃質感的背景，
+// 不論一般模式或關懷模式都套用同一種樣式（關懷模式原本另外在右下角疊一個打勾徽章，一併移除）。
+const ICON_SELECTED_GLASS = {
+  background: 'rgba(255,255,255,0.55)',
+  backdropFilter: 'blur(12px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+  border: '1px solid rgba(255,255,255,0.5)',
+  boxShadow: '0 2px 8px rgba(31,38,135,0.12)',
+};
+function iconPickStyle(selected, extra = {}) {
+  return selected ? { ...ICON_SELECTED_GLASS, ...extra } : { background: 'transparent', border: '1px solid transparent', ...extra };
+}
+function getUtcOffset(tz, now) {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' });
+    const part = dtf.formatToParts(now).find(p => p.type === 'timeZoneName');
+    if (!part) return '';
+    return part.value.replace('GMT', 'UTC').replace(/UTC$/, 'UTC+00:00');
+  } catch (e) { return ''; }
+}
+function getOffsetMinutes(tz, now) {
+  const offsetStr = getUtcOffset(tz, now);
+  const m = offsetStr.match(/UTC([+-])(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+}
+function formatOffsetDiff(diffMinutes) {
+  const sign = diffMinutes > 0 ? '+' : '−';
+  const abs = Math.abs(diffMinutes);
+  const h = Math.floor(abs / 60);
+  const mm = abs % 60;
+  return `${sign}${h}${mm ? `:${String(mm).padStart(2, '0')}` : ''}`;
+}
+
+/* ---------------- Language switcher ---------------- */
+// 全域下拉選單協調機制：修正「國旗浮在選單上方」的顯示問題。
+// 根因：FlagPortal（見下方定義）為了不被灰階濾鏡影響，用 createPortal 把國旗獨立掛到
+// document.body、zIndex 40 顯示。但「切換語言」選單（z-20）跟「添加時區」選單（z-10）
+// 是各自獨立的 state，彼此沒有互斥——如果使用者打開「添加時區」選單後，沒關閉它就再打開
+// 「切換語言」選單，兩個選單會同時存在，「添加時區」清單裡各國旗的 portal（zIndex 40）
+// 就會直接蓋在後開啟、疊在視覺上層的語言選單（zIndex 20）上面，看起來像是「國旗憑空浮在
+// 選單最上層」。用一個簡單的 DOM 自訂事件讓所有下拉選單互斥（打開一個時，其餘全部關閉），
+// 就不會再有兩個選單同時掛著、國旗 portal 穿幫的情況。
+const DROPDOWN_CLOSE_EVENT = 'app:dropdown-open';
+function openDropdownExclusive(id) {
+  window.dispatchEvent(new CustomEvent(DROPDOWN_CLOSE_EVENT, { detail: id }));
+}
+function useExclusiveDropdown(id, isOpen, close) {
+  useEffect(() => {
+    function handler(e) {
+      if (e.detail !== id) close();
+    }
+    window.addEventListener(DROPDOWN_CLOSE_EVENT, handler);
+    return () => window.removeEventListener(DROPDOWN_CLOSE_EVENT, handler);
+  }, [id, close]);
+}
+
+// 上面那個互斥機制解決了「兩個選單同時開著」的情況，但實測後發現國旗浮空還有第二個成因，
+// 而且更常見：FlagPortal（見下方）為了跳出灰階濾鏡，全部固定用 zIndex 40 掛在 document.body
+// 下面——這個 zIndex 是寫死的全域值，跟「目前有沒有選單開著、開著的是哪一個」完全無關。
+// 所以只要「添加時區」選單一打開，它自己的半透明卡片背景其實只有 z-10～z-20，蓋不住 zIndex 40
+// 的國旗——而「世界時鐘」清單裡已加入的時區（例如剛加進去的美國、新加坡）卡片上的國旗，
+// 只要位置剛好落在選單展開後覆蓋到的螢幕範圍內，就會直接穿透選單的背景，浮在選單最上層，
+// 跟選單裡「目前那一列」完全無關、對不上——這才是螢幕截圖裡看到的「國旗貼錯列」的真正成因。
+//
+// 修法：用一個極簡的訂閱／發布機制，記錄「目前是哪個選單容器是打開的」。FlagPortal 每一幀都check
+// 自己的錨點是否仍在「目前打開的那個選單容器」之內——如果選單打開了、而這面國旗不屬於這個選單
+// （例如世界時鐘清單裡已加入國家的國旗），就先不渲染，等選單關閉後再正常顯示。這樣不管選單背景
+// 疊在誰上面，都不會有國旗穿幫的問題。
+let currentOpenDropdownEl = null;
+const openDropdownListeners = new Set();
+function setOpenDropdownEl(el) {
+  currentOpenDropdownEl = el;
+  openDropdownListeners.forEach(fn => fn(el));
+}
+function clearOpenDropdownElIfMine(el) {
+  if (currentOpenDropdownEl === el) setOpenDropdownEl(null);
+}
+function useRegisterOpenDropdown(containerRef, isOpen) {
+  useEffect(() => {
+    if (isOpen) {
+      setOpenDropdownEl(containerRef.current);
+      return () => clearOpenDropdownElIfMine(containerRef.current);
+    }
+  }, [isOpen, containerRef]);
+}
+function useOpenDropdownEl() {
+  const [el, setEl] = useState(currentOpenDropdownEl);
+  useEffect(() => {
+    openDropdownListeners.add(setEl);
+    return () => openDropdownListeners.delete(setEl);
+  }, []);
+  return el;
+}
+
+// 折叠屏展开、平板、桌面等大屏的判斷：用 matchMedia 監聽視窗寬度是否達到分欄門檻。
+// 折疊手機展開後的可視寬度通常落在 700～900px 之間，這裡取 760px 作為門檻——
+// 略高於手機直向寬度（一般 <480px），也低於多數折疊機展開寬度，桌面瀏覽器視窗更是輕鬆超過。
+// 用 matchMedia 而非單純 window.innerWidth，是因為它能訂閱變化事件，使用者拖曳視窗大小、
+// 或折疊手機展開/闔上時，畫面能即時響應切換版面，不需要額外綁 resize 事件自己節流。
+const LARGE_SCREEN_BREAKPOINT = 760;
+function useIsLargeScreen(breakpoint = LARGE_SCREEN_BREAKPOINT) {
+  const [isLarge, setIsLarge] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= breakpoint : false));
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
+    const handler = () => setIsLarge(mq.matches);
+    handler();
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return isLarge;
+}
+
+function LangSwitcher({ lang, setLang }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useExclusiveDropdown('lang', open, () => setOpen(false));
+  useRegisterOpenDropdown(ref, open);
+
+  return (
+    <div className="relative flex-shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen(v => {
+          const next = !v;
+          if (next) openDropdownExclusive('lang');
+          return next;
+        })}
+        className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-full"
+        style={glass({ color: INK })}
+      >
+        <Globe size={14} /> {LANG_NAMES[lang]}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 rounded-xl overflow-hidden z-20" style={{ ...glass(), width: 140, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}>
+          {LANGS.map(l => (
+            <button
+              key={l}
+              onClick={() => { setLang(l); setOpen(false); }}
+              className="w-full text-left px-3 py-2 text-sm"
+              style={{ color: l === lang ? ACCENT : INK, background: l === lang ? 'var(--card-border)' : 'transparent' }}
+            >
+              {LANG_NAMES[l]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- 倒數日提醒設定 ---------------- */
+// 跟 LangSwitcher 用同一套下拉面板骨架（點按鈕展開、點外面關閉、跟其他下拉選單互斥），
+// 只是內容換成「啟用通知」開關 + 「提前幾天提醒」數字輸入。
+// 實際的排程／檢查邏輯（Notification 權限、定時檢查、避免重複通知）都在 App 那一層，
+// 這裡純粹是設定介面，不碰任何排程細節。
+function NotifySettingsButton({ enabled, onToggle, daysBefore, setDaysBefore, permission, t }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useExclusiveDropdown('notify', open, () => setOpen(false));
+  useRegisterOpenDropdown(ref, open);
+
+  const unsupported = permission === 'unsupported';
+
+  return (
+    <div className="relative flex-shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen(v => {
+          const next = !v;
+          if (next) openDropdownExclusive('notify');
+          return next;
+        })}
+        aria-label={t.notifyButtonLabel}
+        title={t.notifyButtonLabel}
+        className="flex items-center justify-center rounded-full flex-shrink-0"
+        style={{ ...glass(), width: 34, height: 34, color: enabled ? ACCENT : INK }}
+      >
+        {enabled ? <Bell size={16} /> : <BellOff size={16} />}
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 mt-2 rounded-xl overflow-hidden z-20 p-4 flex flex-col gap-3"
+          style={{ ...glass(), width: 250, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <p className="text-sm font-bold" style={{ color: INK }}>{t.notifyPanelTitle}</p>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm" style={{ color: INK }}>{t.notifyEnableLabel}</span>
+            <button
+              onClick={() => onToggle(!enabled)}
+              className="relative flex-shrink-0"
+              style={{ width: 40, height: 24, borderRadius: 12, background: enabled ? ACCENT : 'var(--card-border)', transition: 'background 0.2s ease' }}
+            >
+              <span
+                className="absolute rounded-full bg-white"
+                style={{ width: 18, height: 18, top: 3, left: enabled ? 19 : 3, transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+              />
+            </button>
+          </div>
+          <p className="text-xs" style={{ color: INK_SOFT }}>{t.notifyEnableHint}</p>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm" style={{ color: INK }}>{t.notifyDaysBeforeLabel}</span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={daysBefore}
+                onChange={e => {
+                  const v = parseInt(e.target.value, 10);
+                  setDaysBefore(Number.isFinite(v) ? Math.max(0, Math.min(365, v)) : 0);
+                }}
+                className="text-sm text-center rounded-lg px-2 py-1"
+                style={{ width: 52, background: 'var(--card-border)', color: INK, border: 'none' }}
+              />
+              <span className="text-xs" style={{ color: INK_SOFT }}>{t.notifyDaysBeforeUnit}</span>
+            </div>
+          </div>
+
+          {unsupported && <p className="text-xs font-medium" style={{ color: DANGER }}>{t.notifyUnsupported}</p>}
+          {permission === 'denied' && <p className="text-xs font-medium" style={{ color: DANGER }}>{t.notifyPermissionDenied}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- World Clock ---------------- */
+// 國旗獨立渲染：關懷模式開啟時，世界時鐘整個區塊會被套上 grayscale 濾鏡，但國旗不應該被變灰。
+// CSS 的 filter 套在祖先層級上，子元素沒辦法自己「跳出」濾鏡，所以改成把國旗本身用 createPortal
+// 掛到 document.body 底下，脫離會被套濾鏡的祖先層級；同時原本的位置留一個 visibility:hidden
+// 的佔位元素撐住版面（大小、間距都不變），再用 getBoundingClientRect 量出佔位元素的螢幕座標，
+// 讓 portal 出去的國旗用 position:fixed 疊回同一個位置，視覺上完全看不出差異。
+// 座標用 requestAnimationFrame 持續同步（而不是只在掛載時量一次），這樣捲動清單、拖曳收合
+// 世界時鐘、視窗縮放等任何會讓位置改變的情況，國旗都能跟著移動，不會「飄」在錯的地方。
+function FlagPortal({ flag, className, style, zIndex = 40 }) {
+  const anchorRef = useRef(null);
+  const [rect, setRect] = useState(null);
+  const [visible, setVisible] = useState(true);
+  const openDropdownEl = useOpenDropdownEl();
+
+  useEffect(() => {
+    let frameId;
+    const sync = () => {
+      const el = anchorRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setRect(prev => (
+          prev && prev.top === r.top && prev.left === r.left && prev.width === r.width && prev.height === r.height
+        ) ? prev : { top: r.top, left: r.left, width: r.width, height: r.height });
+
+        // 因為國旗被 portal 到 document.body、脫離了原本的祖先層級，
+        // 如果祖先當中有一層是可捲動清單（例如「添加時區」下拉選單），
+        // 該清單原生的 overflow 裁切對 portal 出去的國旗完全沒有作用——
+        // 國旗會直接穿出清單範圍、浮在上面或下面，不會隨著捲動被裁掉。
+        // 這裡自己找出最近的可捲動祖先，手動判斷國旗目前是否還落在它的可視範圍內，
+        // 不在範圍內就不渲染，行為上等同被裁切掉。
+        let clipRect = null;
+        let node = el.parentElement;
+        while (node) {
+          const cs = window.getComputedStyle(node);
+          if (/(auto|scroll)/.test(cs.overflowY) || /(auto|scroll)/.test(cs.overflow)) {
+            clipRect = node.getBoundingClientRect();
+            break;
+          }
+          node = node.parentElement;
+        }
+        const withinClip = !clipRect || (
+          r.bottom > clipRect.top && r.top < clipRect.bottom &&
+          r.right > clipRect.left && r.left < clipRect.right
+        );
+
+        // 另一種浮空情況：目前有下拉選單（語言／添加時區）開著，而這面國旗的錨點
+        // 不屬於那個選單（例如世界時鐘卡片裡已加入國家的國旗）。選單的卡片背景
+        // zIndex 比國旗低，蓋不住它，國旗就會直接穿透選單、浮在選單最上層、
+        // 位置也對不上選單裡的任何一列。
+        // 這裡不能只看「屬不屬於這個選單」就決定要不要隱藏——上一版這樣寫，結果變成
+        // 只要選單一開，不屬於選單的國旗全部憑空消失（例如世界時鐘卡片，明明離選單
+        // 展開的範圍很遠，根本不會被蓋到，卻也被藏起來）。正確判斷要多加一個條件：
+        // 這面國旗目前的螢幕座標，跟選單展開後佔據的範圍是否真的有重疊——
+        // 有重疊才代表它「會被選單蓋住／穿幫」，這時才需要暫時隱藏；
+        // 沒有重疊（不屬於選單，也沒被選單蓋到）就正常顯示，不受選單開關影響。
+        let withinOpenDropdown = true;
+        if (openDropdownEl && !openDropdownEl.contains(el)) {
+          const dr = openDropdownEl.getBoundingClientRect();
+          const overlapsDropdown = r.bottom > dr.top && r.top < dr.bottom && r.right > dr.left && r.left < dr.right;
+          withinOpenDropdown = !overlapsDropdown;
+        }
+
+        const nextVisible = withinClip && withinOpenDropdown;
+        setVisible(prev => (prev === nextVisible ? prev : nextVisible));
+      }
+      frameId = requestAnimationFrame(sync);
+    };
+    frameId = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(frameId);
+  }, [openDropdownEl]);
+
+  return (
+    <>
+      <span ref={anchorRef} className={className} style={{ ...style, visibility: 'hidden' }}>{flag}</span>
+      {rect && visible && createPortal(
+        <span
+          className={className}
+          style={{
+            ...style,
+            position: 'fixed',
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            margin: 0,
+            pointerEvents: 'none',
+            // 原本是 2，比「添加時區」下拉選單（z-10）、header（z-30）都低，
+            // 所以國旗永遠被畫在這些 UI 的不透明背景「下面」、被完全蓋住看不見。
+            // 提高到 40，蓋過一般版面內容，但仍低於彈出視窗（z-200）之類的最上層元素。
+            // 若元件在更上層的彈窗（例如目前位置時鐘視窗，z-200）裡使用，呼叫端可傳入
+            // 更高的 zIndex（見 CurrentLocationClockModal），否則國旗仍會被彈窗背景蓋住。
+            zIndex,
+          }}
+        >
+          {flag}
+        </span>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function ClockRow({ clock, now, selectMode, selected, onLongPress, onTap, lang, t, compact, isHome, homeTz, hero, onOpenClockModal }) {
+  const timerRef = useRef(null);
+  const firedRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const dblTapRef = useRef(null);
+  const LONG_PRESS_MOVE_THRESHOLD = 10; // px：手指/滑鼠移動超過這個距離就視為在捲動或拖曳，不算「按住不動」
+  const DOUBLE_TAP_DELAY = 280; // ms：兩次點擊間隔在這個時間內視為雙擊/雙點
+  const start = (e) => {
+    firedRef.current = false;
+    const point = e.touches ? e.touches[0] : e;
+    startPosRef.current = { x: point.clientX, y: point.clientY };
+    timerRef.current = setTimeout(() => { firedRef.current = true; onLongPress(clock.id); }, 500);
+  };
+  const clear = () => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = null; };
+  // 長按觸發前若偵測到手指/滑鼠移動超過門檻（例如在捲動時區清單），就取消這次長按判定，
+  // 避免「長按=進入多選刪除模式」在使用者其實只是想捲動畫面時被誤觸發
+  const move = (e) => {
+    if (!timerRef.current) return;
+    const point = e.touches ? e.touches[0] : e;
+    const dx = point.clientX - startPosRef.current.x;
+    const dy = point.clientY - startPosRef.current.y;
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_THRESHOLD) clear();
+  };
+  // 只有「目前位置」卡片（hero）才需要分辨單擊（設為/取消目前位置）跟雙擊（開啟時鐘視窗）。
+  // 手機上的 touch tap 也會觸發瀏覽器合成的 click 事件，所以這裡統一用 click 事件本身
+  // 記錄「上一次點擊時間」來判斷雙擊，同時支援滑鼠雙擊與手指快速點兩下。
+  const handleClick = () => {
+    if (firedRef.current) { firedRef.current = false; return; }
+    if (hero && onOpenClockModal) {
+      if (dblTapRef.current) {
+        clearTimeout(dblTapRef.current);
+        dblTapRef.current = null;
+        onOpenClockModal(clock.id);
+        return;
+      }
+      dblTapRef.current = setTimeout(() => {
+        dblTapRef.current = null;
+        onTap(clock.id);
+      }, DOUBLE_TAP_DELAY);
+      return;
+    }
+    onTap(clock.id);
+  };
+  useEffect(() => () => { if (dblTapRef.current) clearTimeout(dblTapRef.current); }, []);
+
+  const country = COUNTRIES.find(c => c.id === clock.countryId);
+  const zone = country ? country.zones.find(z => z.tz === clock.tz) : null;
+  const nameLabel = country ? country.name[lang] : clock.tz;
+  const subLabel = country && country.zones.length > 1 && zone && zone.label ? zone.label[lang] : null;
+
+  const timeStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { timeZone: clock.tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+  const offsetStr = getUtcOffset(clock.tz, now);
+  const localDay = now.getDate();
+  const tzDay = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: clock.tz, day: 'numeric' }).format(now));
+  const dayOffset = tzDay === localDay ? '' : tzDay > localDay ? t.tomorrow : t.yesterday;
+
+  // 與目前位置的時差（僅在有設定目前位置，且這不是目前位置本身時顯示）
+  let diffLabel = null;
+  if (homeTz && !isHome) {
+    const diffMinutes = getOffsetMinutes(clock.tz, now) - getOffsetMinutes(homeTz, now);
+    diffLabel = diffMinutes === 0 ? t.sameAsCurrent : `${formatOffsetDiff(diffMinutes)}${t.diffHourSuffix}`;
+  }
+
+  const rowBg = selected ? 'rgba(255,0,74,0.10)' : isHome ? 'rgba(108,123,224,0.08)' : CARD_BG;
+  const rowBorder = selected ? `1.5px solid ${DANGER}` : isHome ? `1.5px solid ${ACCENT}` : CARD_BORDER;
+
+  if (hero) {
+    return (
+      <button
+        onMouseDown={start} onMouseUp={clear} onMouseLeave={clear}
+        onMouseMove={move} onTouchMove={move}
+        onTouchStart={start} onTouchEnd={clear}
+        onClick={handleClick}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' && e.shiftKey) || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            onLongPress(clock.id);
+          }
+        }}
+        className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl relative"
+        style={{ background: selected ? 'rgba(255,0,74,0.10)' : 'rgba(108,123,224,0.08)', border: selected ? `1.5px solid ${DANGER}` : `1.5px solid ${ACCENT}`, userSelect: 'none', WebkitUserSelect: 'none' }}
+      >
+        {selectMode && (
+          <span className="absolute flex items-center justify-center rounded" style={{ width: 17, height: 17, top: 6, left: 6, border: `1px solid ${selected ? DANGER : INK_SOFT}`, background: selected ? DANGER : 'rgba(255,255,255,0.9)', zIndex: 1 }}>
+            {selected && <Check size={11} color="#fff" />}
+          </span>
+        )}
+        <div className="flex items-center gap-3 min-w-0">
+          <FlagPortal
+            flag={country ? country.flag : '🌐'}
+            className="text-3xl flex-shrink-0 leading-none flex items-center justify-center rounded-xl"
+            style={{ width: 44, height: 44, background: CARD_BG, border: CARD_BORDER }}
+          />
+          <div className="flex flex-col items-start min-w-0">
+            <span className="text-xs font-bold truncate" style={{ color: ACCENT }}>📍{t.currentLocation}</span>
+            <span className="font-bold text-base truncate" style={{ color: INK }}>{nameLabel}</span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end flex-shrink-0 pl-3">
+          <span className="font-bold tabular-nums whitespace-nowrap leading-none" style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 28, color: selected ? DANGER : INK }}>{timeStr}</span>
+          <span className="text-xs font-medium whitespace-nowrap mt-1" style={{ color: INK_SOFT }}>{offsetStr}{dayOffset ? `・${dayOffset}` : ''}</span>
+        </div>
+      </button>
+    );
+  }
+
+  if (compact) {
+    return (
+      <button
+        onMouseDown={start} onMouseUp={clear} onMouseLeave={clear}
+        onMouseMove={move} onTouchMove={move}
+        onTouchStart={start} onTouchEnd={clear}
+        onClick={handleClick}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' && e.shiftKey) || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            onLongPress(clock.id);
+          }
+        }}
+        className="flex items-center justify-between px-2.5 py-2 rounded-2xl w-full min-w-0 relative"
+        style={{ background: rowBg, border: rowBorder, userSelect: 'none', WebkitUserSelect: 'none' }}
+      >
+        {selectMode && (
+          <span className="absolute flex items-center justify-center rounded" style={{ width: 14, height: 14, top: 4, left: 4, border: `1px solid ${selected ? DANGER : INK_SOFT}`, background: selected ? DANGER : 'rgba(255,255,255,0.9)', zIndex: 1 }}>
+            {selected && <Check size={9} color="#fff" />}
+          </span>
+        )}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <FlagPortal flag={country ? country.flag : '🌐'} className="text-lg flex-shrink-0 leading-none" />
+          <div className="flex flex-col items-start min-w-0">
+            <span className="font-bold text-xs truncate" style={{ color: INK, maxWidth: 62 }}>{nameLabel}</span>
+            {isHome ? (
+              <span className="text-[9px] font-bold truncate" style={{ color: ACCENT, maxWidth: 62 }}>📍{t.currentLocation}</span>
+            ) : subLabel && (
+              <span className="text-[9px] truncate" style={{ color: INK, maxWidth: 62 }}>{subLabel}</span>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end flex-shrink-0 pl-1.5">
+          <span className="font-bold tabular-nums whitespace-nowrap" style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 15, color: selected ? DANGER : INK }}>{timeStr}</span>
+          <span className="text-[9px] whitespace-nowrap" style={{ color: INK_SOFT }}>{offsetStr}{dayOffset ? `・${dayOffset}` : ''}</span>
+          {diffLabel && <span className="text-[9px] font-bold whitespace-nowrap" style={{ color: ACCENT }}>{diffLabel}</span>}
+        </div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onMouseDown={start} onMouseUp={clear} onMouseLeave={clear}
+      onMouseMove={move} onTouchMove={move}
+      onTouchStart={start} onTouchEnd={clear}
+      onClick={handleClick}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' && e.shiftKey) || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          onLongPress(clock.id);
+        }
+      }}
+      className="w-full flex items-center justify-between px-4 py-3 rounded-2xl relative"
+      style={{ background: rowBg, border: rowBorder, userSelect: 'none', WebkitUserSelect: 'none' }}
+    >
+      {selectMode && (
+        <span className="absolute flex items-center justify-center rounded" style={{ width: 17, height: 17, top: 6, left: 6, border: `1px solid ${selected ? DANGER : INK_SOFT}`, background: selected ? DANGER : 'rgba(255,255,255,0.9)', zIndex: 1 }}>
+          {selected && <Check size={11} color="#fff" />}
+        </span>
+      )}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <FlagPortal flag={country ? country.flag : '🌐'} className="text-2xl flex-shrink-0 leading-none" />
+        <div className="flex flex-col items-start min-w-0">
+          <span className="font-bold text-sm truncate" style={{ color: INK }}>{nameLabel}</span>
+          {isHome ? (
+            <span className="text-xs font-bold truncate" style={{ color: ACCENT }}>📍{t.currentLocation}</span>
+          ) : subLabel && (
+            <span className="text-xs truncate" style={{ color: INK }}>{subLabel}</span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col items-end flex-shrink-0 pl-3">
+        <span className="font-bold tabular-nums whitespace-nowrap" style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 20, color: selected ? DANGER : INK }}>{timeStr}</span>
+        <span className="text-xs whitespace-nowrap" style={{ color: INK_SOFT }}>{offsetStr}{dayOffset ? `・${dayOffset}` : ''}</span>
+        {diffLabel && <span className="text-xs font-bold whitespace-nowrap" style={{ color: ACCENT }}>{diffLabel}</span>}
+      </div>
+    </button>
+  );
+}
+
+// 取得指定時區在指定時間點的時／分／秒（含毫秒，讓錶針可以平滑轉動而不是一秒跳一格）
+function getTimeHMS(date, tz) {
+  try {
+    const zone = tz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+    }).formatToParts(date);
+    const obj = {};
+    parts.forEach(p => { if (p.type !== 'literal') obj[p.type] = parseInt(p.value, 10); });
+    return { h: obj.hour % 24, m: obj.minute, s: obj.second, ms: date.getMilliseconds() };
+  } catch (err) {
+    return { h: date.getHours(), m: date.getMinutes(), s: date.getSeconds(), ms: date.getMilliseconds() };
+  }
+}
+
+/* ---------------- 類比時鐘（analog clock）：用於「目前位置」雙擊彈出的時鐘視窗 ---------------- */
+function AnalogClock({ tz, now, size = 220 }) {
+  const { h, m, s, ms } = getTimeHMS(now, tz);
+  const secDeg = (s + ms / 1000) * 6;
+  const minDeg = (m + s / 60) * 6;
+  const hourDeg = ((h % 12) + m / 60) * 30;
+
+  const R = 100; // viewBox 半徑
+  const ticks = [];
+  for (let i = 0; i < 60; i++) {
+    const deg = i * 6;
+    const major = i % 5 === 0;
+    const r1 = major ? 78 : 84;
+    const r2 = 92;
+    const rad = (deg * Math.PI) / 180;
+    const x1 = 100 + r1 * Math.sin(rad), y1 = 100 - r1 * Math.cos(rad);
+    const x2 = 100 + r2 * Math.sin(rad), y2 = 100 - r2 * Math.cos(rad);
+    ticks.push(
+      <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke={INK} strokeOpacity={major ? 0.55 : 0.25} strokeWidth={major ? 2.2 : 1} strokeLinecap="round" />
+    );
+  }
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 200 200" style={{ flexShrink: 0 }}>
+      <circle cx="100" cy="100" r="98" fill={CARD_BG} stroke={CARD_BORDER === '1px solid var(--card-border)' ? 'var(--card-border)' : CARD_BORDER} strokeWidth="1" />
+      {ticks}
+      <text x="100" y="38" textAnchor="middle" fontSize="16" fontWeight="700" fill={INK} fontFamily="'Quicksand', sans-serif">12</text>
+      <text x="168" y="106" textAnchor="middle" fontSize="16" fontWeight="700" fill={INK} fontFamily="'Quicksand', sans-serif">3</text>
+      <text x="100" y="172" textAnchor="middle" fontSize="16" fontWeight="700" fill={INK} fontFamily="'Quicksand', sans-serif">6</text>
+      <text x="32" y="106" textAnchor="middle" fontSize="16" fontWeight="700" fill={INK} fontFamily="'Quicksand', sans-serif">9</text>
+      {/* 時針 */}
+      <line x1="100" y1="100" x2="100" y2="58" stroke={INK} strokeWidth="5" strokeLinecap="round"
+        transform={`rotate(${hourDeg} 100 100)`} />
+      {/* 分針 */}
+      <line x1="100" y1="100" x2="100" y2="34" stroke={INK} strokeWidth="3.5" strokeLinecap="round"
+        transform={`rotate(${minDeg} 100 100)`} />
+      {/* 秒針 */}
+      <line x1="100" y1="112" x2="100" y2="24" stroke={ACCENT} strokeWidth="1.5" strokeLinecap="round"
+        transform={`rotate(${secDeg} 100 100)`} />
+      <circle cx="100" cy="100" r="5" fill={ACCENT} />
+    </svg>
+  );
+}
+
+/* ---------------- 「目前位置」雙擊彈出的時鐘視窗 ----------------
+ * 上半部：目前位置的類比時鐘（比一般彈窗置中位置再往下移一點，避免緊貼視窗頂端）
+ * 下半部：世界時鐘列表中其他已加入的時區（唯讀列表，僅供查看，不觸發選取/刪除等互動） */
+function CurrentLocationClockModal({ clock, now, restClocks, lang, t, onClose, dock = false, closing = false }) {
+  const country = COUNTRIES.find(c => c.id === clock.countryId);
+  const nameLabel = country ? country.name[lang] : clock.tz;
+  const timeStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { timeZone: clock.tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+  const offsetStr = getUtcOffset(clock.tz, now);
+
+  // 呼出／關閉動畫：'enter' 是剛掛載、尚未套用「顯示中」樣式的那一幀，下一個 rAF
+  // 立刻切到 'shown' 觸發 CSS transition 由小變大、淡入；使用者關閉時先切到 'closing'
+  // 讓 transition 反向播放，等動畫播完（與 CLOSE_DURATION 對齊）才真的呼叫 onClose 卸載，
+  // 而不是直接把整個視窗從畫面上瞬間移除。
+  const [phase, setPhase] = useState('enter');
+  const CLOSE_DURATION = 150;
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setPhase('shown'));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  // dock 模式下，App 那層要換成別的卡片時，會透過這個外部的 closing 訊號告訴這裡「該播放關閉動畫了」，
+  // 跟使用者自己按 X／點背景關閉的差別是：這裡只負責把「正在關閉」的視覺效果播出來，不會自己呼叫
+  // onClose 去卸載自己——真正的內容替換（卸載這張、換上新的一張）時機由 App 那層統一控制，
+  // 兩邊動畫接起來才會有「自動關閉舊卡片、彈出新卡片」的絲滑感，而不是內容瞬間跳掉
+  useEffect(() => {
+    if (closing) setPhase('closing');
+  }, [closing]);
+  function handleClose() {
+    setPhase('closing');
+    setTimeout(onClose, CLOSE_DURATION);
+  }
+  const shown = phase === 'shown';
+
+  return (
+    <div
+      className={dock ? 'relative h-full w-full' : 'fixed inset-0 flex items-center justify-center px-6'}
+      style={dock ? undefined : {
+        zIndex: 200,
+        background: shown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+        transition: `background ${CLOSE_DURATION}ms ease`,
+      }}
+      onClick={dock ? undefined : handleClose}
+    >
+      <div
+        className={dock ? 'w-full h-full overflow-y-auto rounded-3xl p-5 flex flex-col items-center' : 'w-full max-w-sm max-h-[85vh] overflow-y-auto rounded-3xl p-5 flex flex-col items-center'}
+        style={{
+          ...AUTH_GLASS,
+          opacity: shown ? 1 : 0,
+          // dock（分欄右側面板）模式下改成從右邊帶點彈性地「彈射」滑入，
+          // 呼應它在大屏分欄版面裡本來就位於右側的方位；非 dock（手機置中彈窗）維持原本由下往上彈出的效果
+          transform: shown
+            ? 'scale(1) translateX(0px) translateY(0px)'
+            : dock ? 'scale(0.94) translateX(28px) translateY(0px)' : 'scale(0.92) translateX(0px) translateY(14px)',
+          transition: `opacity ${CLOSE_DURATION}ms ease, transform ${CLOSE_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="w-full flex items-center justify-between mb-1">
+          <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: ACCENT }}>
+            📍{t.currentLocation}
+          </span>
+          <button onClick={handleClose} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+        </div>
+
+        <div className="flex items-center gap-2 mt-1">
+          <FlagPortal flag={country ? country.flag : '🌐'} className="text-2xl leading-none" zIndex={210} />
+          <span className="font-bold text-lg" style={{ color: INK }}>{nameLabel}</span>
+        </div>
+
+        {/* 時鐘本體：比一般置中位置再往下推一點 */}
+        <div className="mt-6">
+          <AnalogClock tz={clock.tz} now={now} size={220} />
+        </div>
+
+        <div className="flex flex-col items-center mt-4 mb-5">
+          <span className="font-bold tabular-nums" style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 22, color: INK }}>{timeStr}</span>
+          <span className="text-xs mt-0.5" style={{ color: INK_SOFT }}>{offsetStr}</span>
+        </div>
+
+        {/* 其他已加入的時區列表（唯讀） */}
+        <div className="w-full flex flex-col gap-2">
+          {restClocks.map(c => {
+            const rc = COUNTRIES.find(x => x.id === c.countryId);
+            const rZone = rc ? rc.zones.find(z => z.tz === c.tz) : null;
+            const rName = rc ? rc.name[lang] : c.tz;
+            const rSubLabel = rc && rc.zones.length > 1 && rZone && rZone.label ? rZone.label[lang] : null;
+            const rTimeStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { timeZone: c.tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now);
+            const rOffsetStr = getUtcOffset(c.tz, now);
+            return (
+              <div key={c.id} className="w-full flex items-center justify-between px-4 py-3 rounded-2xl" style={{ background: CARD_BG, border: CARD_BORDER }}>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FlagPortal flag={rc ? rc.flag : '🌐'} className="text-xl flex-shrink-0 leading-none" zIndex={210} />
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="font-bold text-sm truncate" style={{ color: INK }}>{rName}</span>
+                    {rSubLabel && <span className="text-xs truncate" style={{ color: INK_SOFT }}>{rSubLabel}</span>}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end flex-shrink-0 pl-3">
+                  <span className="font-bold tabular-nums whitespace-nowrap" style={{ fontFamily: "'Quicksand', sans-serif", fontSize: 16, color: INK }}>{rTimeStr}</span>
+                  <span className="text-xs whitespace-nowrap" style={{ color: INK_SOFT }}>{rOffsetStr}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzId, setHomeTzId, part2Ref, part2Height, isDraggingWorldClock, isLargeScreen = false, unlimitedHeight = false, clockModalOpen, setClockModalOpen }) {
+  const [now, setNow] = useState(new Date());
+  const [showMenu, setShowMenu] = useState(false);
+  const [submenuCountry, setSubmenuCountry] = useState(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState([]);
+  // 雙欄不再由使用者手動切換，改成加入的時區數量達到 3 個（含）以上時自動切成雙欄，方便一次看到更多時區
+  const columns = clocks.length >= 3 ? 2 : 1;
+  // 「目前位置」設定的是哪一筆時鐘（id）：改由上層 App 提供／持久化（見 HOME_TZ_ID_KEY），
+  // 這個元件重新掛載（例如整頁重新整理）後才不會回復成沒設定的原狀
+  //
+  // 「目前位置時鐘詳情」開關本身也改由上層 App 持有（clockModalOpen／setClockModalOpen），
+  // 而不是這裡自己 useState：大屏分欄模式下，這個視窗不再是蓋在畫面正中央的彈窗，
+  // 而是要嵌進右側面板顯示，App 需要知道「現在該不該顯示」才能決定右側面板放什麼內容。
+  const menuRef = useRef(null);
+
+  useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+        setSubmenuCountry(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useExclusiveDropdown('timezone', showMenu, () => { setShowMenu(false); setSubmenuCountry(null); });
+  useRegisterOpenDropdown(menuRef, showMenu);
+
+  const addedTz = new Set(clocks.map(c => c.tz));
+  const homeClock = clocks.find(c => c.id === homeTzId) || null;
+
+  // 將「目前位置」的時區回報給上層 App，讓頂部標題列能依此判斷早上好／中午好／晚上好
+  useEffect(() => { onHomeTzChange && onHomeTzChange(homeClock ? homeClock.tz : null); }, [homeClock, onHomeTzChange]);
+
+  function addZone(country, tz) {
+    setClocks(prev => [...prev, { id: Date.now().toString(), tz, countryId: country.id }]);
+    setShowMenu(false);
+    setSubmenuCountry(null);
+  }
+  function handleCountryClick(country) {
+    if (country.zones.length === 1) addZone(country, country.zones[0].tz);
+    else setSubmenuCountry(country);
+  }
+  function longPress(id) { setSelectMode(true); setSelected(prev => (prev.includes(id) ? prev : [...prev, id])); }
+  function tap(id) {
+    if (selectMode) {
+      setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+      return;
+    }
+    // 單獨點一下：設為目前位置，再點一下取消
+    setHomeTzId(prev => (prev === id ? null : id));
+  }
+  function confirmDelete() {
+    setClocks(prev => prev.filter(c => !selected.includes(c.id)));
+    if (selected.includes(homeTzId)) setHomeTzId(null);
+    setSelectMode(false);
+    setSelected([]);
+  }
+  function cancelSelect() { setSelectMode(false); setSelected([]); }
+  function openClockModal() { setClockModalOpen(true); }
+
+  const rootOptions = COUNTRIES.filter(c => !c.zones.every(z => addedTz.has(z.tz)));
+  const subOptions = submenuCountry ? submenuCountry.zones.filter(z => !addedTz.has(z.tz)) : [];
+
+  // Part 2 只顯示「非目前位置」的時區；目前位置改成在 Part 1 置頂區塊常駐顯示
+  const restClocks = clocks.filter(c => c.id !== homeTzId);
+
+  return (
+    <div className="mb-2">
+      {/* Part 1：標題列＋控制列＋目前位置卡片。整個 WorldClockSection 現在都位於畫面上方
+          不捲動的固定區域，不再需要自己 sticky／量測高度 */}
+      <div className="pb-1.5">
+        <div className="flex items-center justify-between mb-1.5 pt-1">
+          <div className="flex items-center gap-2">
+            <Clock size={18} style={{ color: ACCENT }} />
+            <h2 className="font-bold" style={{ color: INK, fontSize: 18 }}>{t.worldClock}</h2>
+          </div>
+
+          {selectMode ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: INK_SOFT }}>{t.selectedCount(selected.length)}</span>
+              <button onClick={cancelSelect} className="text-sm px-2 py-1 rounded-lg" style={{ color: INK_SOFT }}>{t.cancel}</button>
+              <button onClick={confirmDelete} disabled={selected.length === 0}
+                className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium"
+                style={{ background: DANGER, color: '#fff', opacity: selected.length === 0 ? 0.4 : 1 }}>
+                <Trash2 size={13} /> {t.delete}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <div className="relative" ref={menuRef}>
+                <button onClick={() => { setShowMenu(v => { const next = !v; if (next) openDropdownExclusive('timezone'); return next; }); setSubmenuCountry(null); }}
+                  className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg font-medium" style={{ background: ACCENT, color: '#fff' }}>
+                  <Plus size={14} /> {t.addTimezone}
+                </button>
+              {showMenu && (
+                <div className="absolute right-0 mt-2 rounded-xl overflow-y-auto z-10" style={{ ...glass(), width: 220, maxHeight: 280, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}>
+                  {!submenuCountry ? (
+                    rootOptions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm" style={{ color: INK_SOFT }}>{t.allAdded}</div>
+                    ) : (
+                      rootOptions.map(c => (
+                        <button key={c.id} onClick={() => handleCountryClick(c)}
+                          className="w-full flex items-center justify-between text-left px-3 py-2 text-sm"
+                          style={{ color: INK }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')} onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                          <span className="flex items-center gap-1.5">
+                            <FlagPortal flag={c.flag} style={{ display: 'inline-block', lineHeight: 1 }} />
+                            {c.name[lang]}
+                          </span>
+                          {c.zones.length > 1 && <ChevronDown size={14} style={{ transform: 'rotate(-90deg)', color: INK_SOFT }} />}
+                        </button>
+                      ))
+                    )
+                  ) : (
+                    <div>
+                      <button onClick={() => setSubmenuCountry(null)} className="w-full flex items-center gap-1 text-left px-3 py-2 text-sm font-medium" style={{ color: ACCENT, borderBottom: CARD_BORDER }}>
+                        <ChevronLeft size={14} /> {t.back}
+                      </button>
+                      {subOptions.length === 0 ? (
+                        <div className="px-3 py-3 text-sm" style={{ color: INK_SOFT }}>{t.allAdded}</div>
+                      ) : (
+                        subOptions.map(z => (
+                          <button key={z.tz} onClick={() => addZone(submenuCountry, z.tz)}
+                                                      className="w-full text-left px-3 py-2 text-sm"
+                            style={{ color: INK }} 
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')} 
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            {z.label ? z.label[lang] : z.tz}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {homeClock && (
+          <ClockRow
+            key={homeClock.id} clock={homeClock} now={now}
+            selectMode={selectMode} selected={selected.includes(homeClock.id)}
+            onLongPress={longPress} onTap={tap} lang={lang} t={t}
+            hero isHome homeTz={homeClock.tz}
+            onOpenClockModal={openClockModal}
+          />
+        )}
+      </div>
+
+      {/* 「目前位置時鐘詳情」視窗：不分手機或大屏，一律用同一種置中彈窗樣式顯示 */}
+      {clockModalOpen && homeClock && (
+        <CurrentLocationClockModal
+          clock={homeClock} now={now} lang={lang} t={t}
+          restClocks={restClocks}
+          onClose={() => setClockModalOpen(false)}
+        />
+      )}
+
+      {/* Part 2：其餘時區列表（以及尚未設定「目前位置」時的提示文字）。高度預設有上限（依畫面高度換算），
+          時區加再多也不會把下面的時間軸推出畫面——超過上限的部份改成在這個範圍內自行上下捲動查看。
+          收合／展開只能靠「時間軸」標題列手動往上拖曳（詳見上層的 handleWorldClockDragStart／Move／End）；
+          原本清單自己捲到底/頂也會連動收合展開的功能已依需求移除，避免捲動清單時不小心誤觸收合。
+          最高只能收到這裡完全消失（高度 0），不會蓋到上面 Part 1 的「目前位置」卡片或世界時鐘標題列——
+          「點一下設為目前位置」這句提示原本放在 Part 1（固定不動），現在改放進這裡，
+          這樣往上拖曳收合時也會一起被蓋住，而不是永遠浮在畫面上。
+          大屏分欄且時間軸在右側（unlimitedHeight）時，世界時鐘自己獨占整個左欄，
+          底下沒有時間軸要搶空間，這個高度上限就沒有意義了，直接取消、讓清單自然展開到底 */}
+      <div
+        ref={part2Ref}
+        style={unlimitedHeight ? {
+          maxHeight: 'none',
+          overflowY: 'visible',
+        } : {
+          maxHeight: `${Math.max(0, part2Height)}px`,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          transition: isDraggingWorldClock ? 'none' : 'max-height 0.25s ease',
+        }}
+      >
+        {clocks.length > 0 && !homeTzId && !selectMode && (
+          <p className="text-xs pt-2 px-1" style={{ color: INK_SOFT }}>{t.setAsCurrent}</p>
+        )}
+        <div className={(columns === 2 ? "grid grid-cols-2 gap-2" : "flex flex-col gap-2") + " pt-1 pb-6"}>
+          {clocks.length === 0 ? (
+            <div className="text-sm px-2 py-4 col-span-2" style={{ color: INK_SOFT }}>{t.emptyClocks}</div>
+          ) : restClocks.length === 0 ? null : (
+            restClocks.map(c => (
+              <ClockRow 
+                key={c.id} clock={c} now={now} 
+                selectMode={selectMode} selected={selected.includes(c.id)} 
+                onLongPress={longPress} onTap={tap} lang={lang} t={t} 
+                compact={columns === 2}
+                isHome={false}
+                homeTz={homeClock ? homeClock.tz : null}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Timeline & Landmark Logic ---------------- */
+
+/* ---------------- 地標卡片匯出成圖片：純 Canvas 手繪 ----------------
+ * 完全用 Canvas 2D API 重新畫一次卡片內容（背景圖模糊、文字、徽章、品牌浮水印），
+ * 不依賴 DOM 截圖或 backdrop-filter（不同瀏覽器／裝置對截圖與濾鏡的支援度差異很大），
+ * 所以匯出結果在任何裝置上都長得一樣。支援兩種輸出比例，讓使用者自選：
+ *   'card'  —— 貼近原本卡片的直式比例，適合單張分享（例如發群組、聊天室）
+ *   'story' —— 1080×1920（IG／FB 限時動態常用尺寸），卡片置中，背景用同一張圖延伸模糊鋪滿全畫面
+ * 右下角固定加上「時光線」品牌浮水印（App 小圖示＋名稱），純用 Canvas 向量畫出來，不需要額外圖檔。
+ */
+const EXPORT_W = 1080;
+const EXPORT_PAD = 64;
+const EXPORT_RADIUS = 56;
+const STORY_W = 1080;
+const STORY_H = 1920;
+
+// App 真正的圖示檔案路徑（public/icon-512.png，已確認）。
+// 載入失敗時會自動 fallback 成下面手繪的簡易徽章，不會讓匯出功能整個壞掉。
+const APP_ICON_SRC = '/icon-512.png';
+let _appIconPromise = null;
+function loadAppIconOnce() {
+  if (!_appIconPromise) {
+    _appIconPromise = loadImageAsync(APP_ICON_SRC).catch(() => null);
+  }
+  return _appIconPromise;
+}
+
+function exportColors(isDark) {
+  return isDark
+    ? { ink: '#F2F3F6', inkSoft: 'rgba(242,243,246,0.65)', cardBg: '#1D2029', cardBorder: '#2B2F3A', pageBg: '#121419' }
+    : { ink: '#232733', inkSoft: 'rgba(35,39,51,0.6)', cardBg: '#F7F8FA', cardBorder: '#ECEDF1', pageBg: '#FFFFFF' };
+}
+
+function loadImageAsync(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+function roundRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+// 把圖片以「cover」方式（填滿並裁切多餘部分，不變形）畫進指定矩形範圍
+function drawImageCover(ctx, img, x, y, w, h) {
+  const srcRatio = img.width / img.height;
+  const dstRatio = w / h;
+  let sx, sy, sw, sh;
+  if (srcRatio > dstRatio) {
+    sh = img.height;
+    sw = sh * dstRatio;
+    sx = (img.width - sw) / 2;
+    sy = 0;
+  } else {
+    sw = img.width;
+    sh = sw / dstRatio;
+    sx = 0;
+    sy = (img.height - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+// 簡單的文字自動換行（給標題用），超過 maxLines 就在最後一行截斷加上「…」
+function wrapCanvasText(ctx, text, maxWidth, maxLines) {
+  const chars = Array.from(text);
+  const lines = [];
+  let line = '';
+  for (let i = 0; i < chars.length; i++) {
+    const test = line + chars[i];
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = chars[i];
+      if (lines.length === maxLines) break;
+    } else {
+      line = test;
+    }
+  }
+  if (lines.length < maxLines && line) lines.push(line);
+  if (lines.length === maxLines) {
+    let last = lines[maxLines - 1];
+    while (ctx.measureText(last + '…').width > maxWidth && last.length > 1) {
+      last = last.slice(0, -1);
+    }
+    const consumedChars = lines.slice(0, maxLines - 1).reduce((n, l) => n + l.length, 0) + last.length;
+    if (consumedChars < chars.length) last += '…';
+    lines[maxLines - 1] = last;
+  }
+  return lines;
+}
+
+// 徽章/膠囊：量文字寬度後畫一個貼合內容的圓角色塊，回傳畫完後的寬度（方便橫向排列）
+function drawPill(ctx, text, x, y, { font, textColor, bgColor, padX = 24, height = 64 }) {
+  ctx.font = font;
+  const textW = ctx.measureText(text).width;
+  const w = textW + padX * 2;
+  roundRectPath(ctx, x, y, w, height, height / 2);
+  ctx.fillStyle = bgColor;
+  ctx.fill();
+  ctx.fillStyle = textColor;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText(text, x + padX, y + height / 2 + 2);
+  return w;
+}
+
+// 品牌浮水印：優先畫「真正的 App 圖示」（appIcon 有載入成功的話），失敗或還沒設定好圖示路徑
+// 品牌浮水印：只使用真正的 App 圖示（icon-512.png），不再有手繪版本。
+// 萬一圖示載入失敗（例如路徑或網路問題），就只畫「時光線」文字，不畫方塊圖示，
+// 確保匯出功能本身不會壞掉，但也不會出現手繪版本混用的情況。
+function drawBrandWatermark(ctx, rightX, bottomY, colors, appIcon) {
+  const label = '時光線';
+  ctx.font = '600 30px "Noto Sans TC", "PingFang TC", sans-serif';
+  const textW = ctx.measureText(label).width;
+  const logoSize = 44;
+  const gap = 14;
+  const totalW = appIcon ? logoSize + gap + textW : textW;
+  const x0 = rightX - totalW;
+  const topY = bottomY - logoSize;
+
+  if (appIcon) {
+    // 真正的 App 圖示：圓角方形裁切＋cover 方式塞滿
+    ctx.save();
+    const radius = logoSize * 0.28;
+    roundRectPath(ctx, x0, topY, logoSize, logoSize, radius);
+    ctx.clip();
+    drawImageCover(ctx, appIcon, x0, topY, logoSize, logoSize);
+    ctx.restore();
+  }
+
+  ctx.fillStyle = colors.ink;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, appIcon ? x0 + logoSize + gap : x0, topY + logoSize / 2 + 1);
+}
+
+// 單行文字截斷（標題、日期小字現在改成單行 truncate，比照現在卡片樣式，不再是多行換行）
+function truncateSingleLine(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const chars = Array.from(text);
+  let line = '';
+  for (let i = 0; i < chars.length; i++) {
+    const test = line + chars[i] + '…';
+    if (ctx.measureText(test).width > maxWidth) break;
+    line += chars[i];
+  }
+  return line + '…';
+}
+
+// 畫出卡片本體（背景圖模糊＋毛玻璃疊層＋所有文字內容＋品牌浮水印），回傳畫好的 canvas。
+// 這個 canvas 本身就是「card」格式的輸出；「story」格式會再把它貼到一張更大的背景上。
+// 版面對照現在「地標詳情」卡片的實際樣式：icon＋標題＋年齡徽章同一行、下方一行小字日期，
+// 徽章（路標色／生日或關懷／重複頻率／曆法）獨立一排，中央是放大＋下移過的漸層大數字，
+// 生日模式時不畫「每年」重複頻率徽章（跟生日徽章語意重複），原始日期只在使用者開啟時才畫一個小方塊。
+async function buildEventCardCanvas(ev, lang, t, isDark) {
+  const colors = exportColors(isDark);
+  const w = EXPORT_W;
+  const contentX = EXPORT_PAD;
+  const contentW = w - EXPORT_PAD * 2;
+
+  const measureCanvas = document.createElement('canvas');
+  const mctx = measureCanvas.getContext('2d');
+
+  const iconBoxSize = 96;
+  const titleFont = '700 56px "Noto Sans TC", "PingFang TC", sans-serif';
+  const ageFont = '700 30px "Noto Sans TC", "PingFang TC", sans-serif';
+  const dateFont = '400 30px "Noto Sans TC", "PingFang TC", sans-serif';
+  const showRepeatBadge = !!ev.repeat && !ev.isBirthday; // 生日模式固定每年重複，跟生日徽章重複，不畫
+  const showAltCalendarBadge = ev.calendar && ev.calendar !== 'gregory' && ev.altCalendarStr;
+
+  // 標題／年齡徽章同一行的寬度分配：先量年齡徽章寬度，剩下的空間才是標題可用寬度（標題單行截斷，比照現在樣式）
+  mctx.font = ageFont;
+  const ageBadgeText = ev.age !== null && ev.age !== undefined ? t.ageBadge(ev.age) : '';
+  const ageBadgeW = ageBadgeText ? mctx.measureText(ageBadgeText).width + 40 : 0; // +40 = 左右內距
+  const titleGap = 20;
+  const iconGap = 24;
+  mctx.font = titleFont;
+  const titleMaxWidth = contentW - iconBoxSize - iconGap - (ageBadgeText ? ageBadgeW + titleGap : 0);
+  const titleLine = truncateSingleLine(mctx, ev.title || '', Math.max(60, titleMaxWidth));
+
+  const headerBlockH = 56 + 12 + 38; // 標題行高 + 間距 + 日期小字行高
+  const headerH = Math.max(iconBoxSize, headerBlockH);
+
+  const badgeRowH = 64;
+  const numberFont = `500 300px ${ev.numberFontFamily || "'Inter', sans-serif"}`;
+  const numberH = 300 * 1.02;
+  const numberLabelH = 46;
+
+  let origDateBoxH = 0;
+  if (ev.showOrigDate) origDateBoxH = 88;
+
+  let h = EXPORT_PAD + headerH + 32 + badgeRowH + 46 + numberH + 16 + numberLabelH + 40;
+  if (origDateBoxH) h += origDateBoxH + 24;
+  h += EXPORT_PAD + 60; // 底部留給品牌浮水印
+  h = Math.round(h);
+
+  const canvas = document.createElement('canvas');
+  const scale = 2; // 匯出用高解析度，避免分享到社媒被壓縮後模糊
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  // ---- 背景：卡片本身的圓角剪裁範圍 ----
+  roundRectPath(ctx, 0, 0, w, h, EXPORT_RADIUS);
+  ctx.save();
+  ctx.clip();
+
+  if (ev.bgImage) {
+    try {
+      const img = await loadImageAsync(ev.bgImage);
+      const glassCleared = ev.bgOverlayOpacity === -1;
+      ctx.filter = glassCleared ? 'none' : 'blur(18px)';
+      // 稍微放大再畫，避免模糊造成邊緣露出裁切外的透明像素
+      drawImageCover(ctx, img, glassCleared ? 0 : -20, glassCleared ? 0 : -20, glassCleared ? w : w + 40, glassCleared ? h : h + 40);
+      ctx.filter = 'none';
+    } catch (err) {
+      ctx.fillStyle = colors.cardBg;
+      ctx.fillRect(0, 0, w, h);
+    }
+    const glassCleared = ev.bgOverlayOpacity === -1;
+    if (!glassCleared) {
+      const opacity = ev.bgOverlayOpacity != null ? Math.max(0, Math.min(1, ev.bgOverlayOpacity)) : 0;
+      ctx.fillStyle = isDark ? `rgba(20,22,28,${opacity})` : `rgba(255,255,255,${opacity})`;
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      // 「原圖模式」：取消 Canvas 模糊與遮罩，直接保留原始圖片。
+      ctx.filter = 'none';
+    }
+  } else {
+    ctx.fillStyle = colors.cardBg;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.restore();
+
+  // 卡片邊框
+  roundRectPath(ctx, 1, 1, w - 2, h - 2, EXPORT_RADIUS);
+  ctx.strokeStyle = colors.cardBorder;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // ---- 內容 ----
+  let cursorY = EXPORT_PAD;
+
+  // 圖示方塊（帶事件顏色的淡色底），比照現在卡片左上角的圓角色塊
+  roundRectPath(ctx, contentX, cursorY, iconBoxSize, iconBoxSize, 26);
+  ctx.fillStyle = `${colorHex(ev.colorId)}1c`;
+  ctx.fill();
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center';
+  ctx.font = '46px "Noto Color Emoji", "Apple Color Emoji", sans-serif';
+  // 部分瀏覽器（尤其 Android Chrome）辨識不到彩色 emoji 字型時，會 fallback 成單色符號並沿用
+  // 目前的 fillStyle——如果不重設，就會直接繼承上面圖示方塊背景那個極淡的顏色，變成「褪色」的樣子，
+  // 所以畫 emoji 之前一定要明確重設成不透明的顏色
+  ctx.fillStyle = colors.ink;
+  ctx.fillText(ev.icon || '📌', contentX + iconBoxSize / 2, cursorY + iconBoxSize / 2 + 2);
+
+  // 標題（單行截斷）＋ 年齡徽章同一行，垂直置中對齊圖示方塊上緣附近（比照現在卡片標題貼齊 icon 上緣的排法）
+  const textBlockX = contentX + iconBoxSize + iconGap;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = titleFont;
+  ctx.fillStyle = colors.ink;
+  ctx.fillText(titleLine, textBlockX, cursorY + 46);
+  if (ageBadgeText) {
+    const titleW = ctx.measureText(titleLine).width;
+    drawPill(ctx, ageBadgeText, textBlockX + titleW + titleGap, cursorY + 12, {
+      font: ageFont, textColor: colorHex(ev.colorId), bgColor: `${colorHex(ev.colorId)}20`, padX: 20, height: 48,
+    });
+  }
+  // 日期小字（單行截斷），貼在標題正下方
+  ctx.font = dateFont;
+  ctx.fillStyle = colors.inkSoft;
+  const dateLine = truncateSingleLine(ctx, ev.dateStr || '', contentW - iconBoxSize - iconGap);
+  ctx.fillText(dateLine, textBlockX, cursorY + 46 + 44);
+
+  cursorY += headerH + 32;
+
+  // 徽章排：路標色 → 生日／關懷 → 重複頻率（生日模式不畫）→ 曆法
+  let badgeX = contentX;
+  ctx.font = '700 28px "Noto Sans TC", "PingFang TC", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.beginPath();
+  ctx.arc(badgeX + 12, cursorY + badgeRowH / 2 - 2, 11, 0, Math.PI * 2);
+  ctx.fillStyle = colorHex(ev.colorId);
+  ctx.fill();
+  ctx.fillStyle = colors.inkSoft;
+  ctx.textAlign = 'left';
+  ctx.fillText(t.markerColorLabel, badgeX + 32, cursorY + badgeRowH / 2);
+  badgeX += 32 + ctx.measureText(t.markerColorLabel).width + 24;
+
+  const pillFontSmall = '700 28px "Noto Sans TC", "PingFang TC", sans-serif';
+  if (ev.isBirthday) {
+    badgeX += drawPill(ctx, t.birthdayLabel, badgeX, cursorY, { font: pillFontSmall, textColor: ACCENT, bgColor: `${ACCENT}20`, padX: 20, height: badgeRowH }) + 16;
+  } else if (ev.isCare) {
+    badgeX += drawPill(ctx, t.careLabel, badgeX, cursorY, { font: pillFontSmall, textColor: colors.inkSoft, bgColor: colors.cardBorder, padX: 20, height: badgeRowH }) + 16;
+  }
+  if (showRepeatBadge) {
+    const repeatLabel = ev.repeatUnit === 'month' ? t.monthlyBadge(ev.repeatInterval) : t.yearlyBadge(ev.repeatInterval);
+    badgeX += drawPill(ctx, repeatLabel, badgeX, cursorY, { font: pillFontSmall, textColor: colors.inkSoft, bgColor: colors.cardBorder, padX: 20, height: badgeRowH }) + 16;
+  }
+  if (showAltCalendarBadge) {
+    badgeX += drawPill(ctx, ev.altCalendarStr, badgeX, cursorY, { font: pillFontSmall, textColor: ACCENT, bgColor: `${ACCENT}20`, padX: 20, height: badgeRowH }) + 16;
+  }
+  cursorY += badgeRowH + 46;
+
+  // 中央大數字：漸層填色，字體套用使用者目前選的數字字體（Canvas 2D 不支援 font-variation-settings，
+  // 所以像 Nabla／Foldit 這類靠自訂軸或可變粗細呈現效果的字體，匯出時只會用該字體的預設樣式呈現）
+  const numberText = ev.diffDays === 0 ? '🎉' : String(Math.abs(ev.diffDays));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  if (ev.diffDays === 0) {
+    ctx.font = '260px "Noto Color Emoji", "Apple Color Emoji", sans-serif';
+    ctx.fillStyle = colors.ink;
+    ctx.fillText(numberText, w / 2, cursorY + 240);
+  } else {
+    ctx.font = numberFont;
+    const numW = ctx.measureText(numberText).width;
+    const grad = ctx.createLinearGradient(w / 2 - numW / 2, cursorY, w / 2 + numW / 2, cursorY + 260);
+    grad.addColorStop(0, colorHex(ev.colorId));
+    grad.addColorStop(1, `${colorHex(ev.colorId)}aa`);
+    ctx.fillStyle = grad;
+    ctx.fillText(numberText, w / 2, cursorY + 240);
+  }
+  cursorY += numberH + 16;
+
+  // 數字下方：兩側分隔線 ＋ 「還有／已過 N 天」文字，比照現在卡片樣式
+  const daysLabel = ev.diffDays === 0 ? t.today : ev.diffDays > 0 ? t.daysLeft(ev.diffDays) : t.daysAgo(Math.abs(ev.diffDays));
+  ctx.font = '500 30px "Noto Sans TC", "PingFang TC", sans-serif';
+  const labelW = ctx.measureText(daysLabel).width;
+  const dividerW = 46;
+  const dividerGap = 24;
+  const totalLabelW = dividerW * 2 + dividerGap * 2 + labelW;
+  const labelStartX = w / 2 - totalLabelW / 2;
+  ctx.strokeStyle = colors.cardBorder;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(labelStartX, cursorY + numberLabelH / 2);
+  ctx.lineTo(labelStartX + dividerW, cursorY + numberLabelH / 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(labelStartX + totalLabelW - dividerW, cursorY + numberLabelH / 2);
+  ctx.lineTo(labelStartX + totalLabelW, cursorY + numberLabelH / 2);
+  ctx.stroke();
+  ctx.fillStyle = colors.inkSoft;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(daysLabel, labelStartX + dividerW + dividerGap, cursorY + numberLabelH / 2 + 1);
+  cursorY += numberLabelH + 40;
+
+  // 原始日期小方塊：只有使用者開啟「顯示原始日期」時才畫，比照現在卡片的呈現方式
+  if (origDateBoxH) {
+    roundRectPath(ctx, contentX, cursorY, contentW, origDateBoxH, 20);
+    ctx.fillStyle = colors.cardBg;
+    ctx.fill();
+    ctx.strokeStyle = colors.cardBorder;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.font = '400 28px "Noto Sans TC", "PingFang TC", sans-serif';
+    ctx.fillStyle = colors.inkSoft;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${t.originalDate}：${ev.origDateStr}`, contentX + 28, cursorY + origDateBoxH / 2 + 1);
+    cursorY += origDateBoxH + 24;
+  }
+
+  // 品牌浮水印：先嘗試載入真正的 App 圖示，載入失敗（或還沒設定正確路徑）就自動用手繪版本
+  const appIcon = await loadAppIconOnce();
+  drawBrandWatermark(ctx, w - EXPORT_PAD, h - EXPORT_PAD + 12, colors, appIcon);
+
+  return canvas;
+}
+
+// 'story' 格式：把卡片貼在 1080×1920 的全螢幕背景上（背景用同一張圖延伸模糊鋪滿，沒有自訂圖就用漸層）
+async function buildStoryCanvas(cardCanvas, ev, isDark) {
+  const colors = exportColors(isDark);
+  const canvas = document.createElement('canvas');
+  canvas.width = STORY_W;
+  canvas.height = STORY_H;
+  const ctx = canvas.getContext('2d');
+
+  if (ev.bgImage) {
+    try {
+      const img = await loadImageAsync(ev.bgImage);
+      ctx.filter = 'blur(36px)';
+      drawImageCover(ctx, img, -40, -40, STORY_W + 80, STORY_H + 80);
+      ctx.filter = 'none';
+      ctx.fillStyle = isDark ? 'rgba(10,11,15,0.45)' : 'rgba(255,255,255,0.25)';
+      ctx.fillRect(0, 0, STORY_W, STORY_H);
+    } catch (err) {
+      ctx.fillStyle = colors.pageBg;
+      ctx.fillRect(0, 0, STORY_W, STORY_H);
+    }
+  } else {
+    const grad = ctx.createLinearGradient(0, 0, 0, STORY_H);
+    if (isDark) { grad.addColorStop(0, '#1D2029'); grad.addColorStop(1, '#121419'); }
+    else { grad.addColorStop(0, '#EFF1FE'); grad.addColorStop(1, '#FFFFFF'); }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, STORY_W, STORY_H);
+  }
+
+  const scale = Math.min(1, (STORY_W - 100) / (cardCanvas.width / 2));
+  const cw = (cardCanvas.width / 2) * scale;
+  const ch = (cardCanvas.height / 2) * scale;
+  const cx = (STORY_W - cw) / 2;
+  const cy = (STORY_H - ch) / 2;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.28)';
+  ctx.shadowBlur = 60;
+  ctx.shadowOffsetY = 20;
+  ctx.drawImage(cardCanvas, cx, cy, cw, ch);
+  ctx.restore();
+
+  return canvas;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+}
+
+async function exportEventCardImage(ev, lang, t, isDark, format) {
+  const cardCanvas = await buildEventCardCanvas(ev, lang, t, isDark);
+  const finalCanvas = format === 'story' ? await buildStoryCanvas(cardCanvas, ev, isDark) : cardCanvas;
+  const blob = await canvasToBlob(finalCanvas);
+  const safeTitle = (ev.title || 'event').replace(/[\\/:*?"<>|]/g, '').slice(0, 24);
+  const filename = `時光線_${safeTitle}_${format === 'story' ? 'story' : 'card'}.png`;
+  return { blob, filename };
+}
+
+async function shareOrDownloadImage(blob, filename, t) {
+  const file = new File([blob], filename, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // 使用者自己取消分享，不算失敗
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ---------------- 地標詳情視窗：點一下時間軸卡片（非編輯／刪除按鈕）開啟 ----------------
+ * 完整呈現這個地標的所有資訊（日期、對照曆法、重複週期、生日歲數、關懷模式等），
+ * 並提供「上傳圖片當卡片背景」的功能：圖片是獨立疊在毛玻璃卡片「下面」的一層，
+ * 卡片本身的 backdropFilter 模糊＋泛白效果會直接套用在這張圖片上，
+ * 呈現「毛玻璃蓋在照片上」的效果，而不是把毛玻璃質感整個換掉。 */
+function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSetBgOpacity, onSetNumberFont, dock = false, closing = false }) {
+  const [phase, setPhase] = useState('enter'); // 'enter' -> 'shown' -> 'closing'，動畫節奏同世界時鐘的視窗
+  const CLOSE_DURATION = 150;
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setPhase('shown'));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  // dock 模式下，App 那層换成別的卡片時會透過 closing 這個外部訊號要求播放關閉動畫，
+  // 這裡只負責視覺效果，不會自己呼叫 onClose——卸載／換上新卡片的時機統一由 App 控制
+  useEffect(() => {
+    if (closing) setPhase('closing');
+  }, [closing]);
+  function handleClose() {
+    setPhase('closing');
+    setTimeout(onClose, CLOSE_DURATION);
+  }
+  const shown = phase === 'shown';
+
+  // 視窗開著時鎖住背後頁面的捲動：非 dock（手機置中彈窗）模式下，視窗本身雖然是 fixed 定位，
+  // 但如果背後的頁面還能被手指滑動，視覺上會讓人覺得「整張卡片被拖走」了（如截圖所示，
+  // 卡片跟著背後時間軸一起位移）。這裡在視窗掛載期間把 body 捲動鎖住，卸載時還原，
+  // dock（分欄嵌入右側面板）模式不受影響，因為它本來就不是蓋在整頁上面的彈窗。
+  useEffect(() => {
+    if (dock) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, [dock]);
+
+  // 自動判斷背景圖是偏亮還是偏暗：把圖片縮到很小的尺寸畫進 canvas，取像素平均「感知亮度」
+  // （ITU-R BT.601 加權公式，比單純三色平均更貼近人眼對亮度的感受），低於門檻視為暗色圖片。
+  // 只需要抓一個概略趨勢，不追求精準，所以縮到 24x24 已經足夠且很快。
+  const [bgIsDark, setBgIsDark] = useState(false);
+  useEffect(() => {
+    if (!ev.bgImage) { setBgIsDark(false); return; }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const size = 24;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        const { data } = ctx.getImageData(0, 0, size, size);
+        let total = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          total += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        }
+        setBgIsDark(total / (data.length / 4) < 130);
+      } catch (err) {
+        setBgIsDark(false); // 讀取像素失敗（例如圖片來源受跨網域限制）一律當作亮色處理，不強制變白字
+      }
+    };
+    img.onerror = () => setBgIsDark(false);
+    img.src = ev.bgImage;
+    return () => { cancelled = true; };
+  }, [ev.bgImage]);
+  // 只有「直接蓋在背景圖片上、自己沒有另外一層實色底色」的文字／圖示，才需要在背景偏暗時
+  // 換成白色，否則像素卡片背景、標籤徽章這些本來就有自己實色底色的元素，字色反而不該跟著換
+  // （不然背景偏亮時的白底配白字、或背景偏暗時深色底配深色字，都會變得完全看不見）。
+  const cardInk = ev.bgImage && bgIsDark ? '#fff' : INK;
+  const cardInkSoft = ev.bgImage && bgIsDark ? 'rgba(255,255,255,0.78)' : INK_SOFT;
+
+  const [uploading, setUploading] = useState(false);
+  const [bgError, setBgError] = useState('');
+  const fileInputRef = useRef(null);
+  // 「調節遮罩透明度」面板的展開狀態：只有設定過自訂背景圖片時才有意義。
+  // bgOverlayOpacity 始終代表「遮罩本身」的不透明度；毛玻璃 blur 效果固定，不由此滑桿控制。
+  const [showOpacityAdjust, setShowOpacityAdjust] = useState(false);
+  // bgOverlayOpacity 0～1 代表遮罩本身的不透明度；-1 是一個保留值，代表「清除玻璃效果（原圖模式）」。
+  // 這樣可以在不新增資料欄位的前提下保存「原圖模式」，也能兼容既有事件資料。
+  // 預設（使用者從未調整過）的遮罩不透明度是 0.75，對應滑桿數值 25（=「25% 透明」）。
+  const glassCleared = ev.bgOverlayOpacity === -1;
+  // 遮罩預設值：使用者剛上傳圖片、還沒自己調整過時，滑桿數值預設是 100（遮罩幾乎完全透明，直接看到照片）。
+  const DEFAULT_BG_OPACITY = 0;
+  // 卡片沒有自訂背景圖片時，卡片本身的毛玻璃底色透明度固定是 25（即 75% 不透明）。
+  const NO_IMAGE_CARD_OPACITY = 0.75;
+  const bgOpacity = glassCleared ? 0 : Math.max(0, Math.min(1, ev.bgOverlayOpacity != null ? ev.bgOverlayOpacity : DEFAULT_BG_OPACITY));
+  const SLIDER_MAX = 100;
+  // 滑桿數值＝「透明度」，0～100：0 是遮罩完全不透明，100 是遮罩完全消失（等同看到原圖）。
+  const overlaySliderValue = Math.round((1 - bgOpacity) * SLIDER_MAX);
+  const originalImageLabel = lang === 'zh-TW' ? '原圖' : lang === 'ja' ? '原画像' : lang === 'ko' ? '원본' : 'Original';
+  // 「原圖」改成滑桿右側一顆獨立的長條按鈕：記住切換到原圖模式之前的透明度，
+  // 這樣再次點擊取消原圖模式時，可以還原回使用者原本調整的數值，而不是每次都跳回預設值。
+  const lastOpacityRef = useRef(bgOpacity);
+  useEffect(() => {
+    if (!glassCleared) lastOpacityRef.current = bgOpacity;
+  }, [bgOpacity, glassCleared]);
+  function toggleOriginalImage() {
+    if (glassCleared) {
+      onSetBgOpacity(lastOpacityRef.current != null ? lastOpacityRef.current : DEFAULT_BG_OPACITY);
+    } else {
+      onSetBgOpacity(-1);
+    }
+  }
+  // 拖動滑桿時即時顯示目前的透明度數值：mousedown/touchstart 開始顯示，
+  // 放開（可能是放在滑桿以外的地方）時透過 window 上的事件監聽收起，避免手指滑出滑桿範圍後數值提示卡住不消失。
+  const [sliderDragging, setSliderDragging] = useState(false);
+  useEffect(() => {
+    if (!sliderDragging) return;
+    const stop = () => setSliderDragging(false);
+    window.addEventListener('mouseup', stop);
+    window.addEventListener('touchend', stop);
+    window.addEventListener('touchcancel', stop);
+    return () => {
+      window.removeEventListener('mouseup', stop);
+      window.removeEventListener('touchend', stop);
+      window.removeEventListener('touchcancel', stop);
+    };
+  }, [sliderDragging]);
+  // 「自定義」二級面板：把卡片背景／數字字體這些比較次要的設定收在齒輪按鈕後面，
+  // 預設收合，點擊後視窗才會縱向加長展開，避免一打開詳情視窗就塞滿一堆按鈕
+  const [showCustomizePanel, setShowCustomizePanel] = useState(false);
+  const numberFontId = ev.numberFont || 'inter';
+  const numberFontFamily = getNumberFontFamily(numberFontId);
+  const numberFontVariation = getNumberFontVariation(numberFontId);
+  // 卡片一渲染就先載入「目前選中的」這款字體（若不是預設的系統圓體，例如使用者曾選過其他字體），
+  // 不等使用者打開自定義面板才載入，否則字體檔案還沒到位、瀏覽器會先 fallback 成系統字體。
+  // 系統圓體本身已經在 App 啟動時全域載入過了，這裡主要是補載「非預設」的字體。
+  useEffect(() => {
+    const current = NUMBER_FONTS.find(f => f.id === numberFontId);
+    if (current) ensureGoogleFontLoaded(current.googleFont);
+  }, [numberFontId]);
+  // 面板打開後再把「其餘」字體也載入，方便使用者切換時預覽（系統圓體／Quicksand 不需要，其餘幾款才需要）
+  useEffect(() => {
+    if (!showCustomizePanel) return;
+    NUMBER_FONTS.forEach(f => ensureGoogleFontLoaded(f.googleFont));
+  }, [showCustomizePanel]);
+
+  async function handleFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // 清空，允許之後重新選同一個檔案也能觸發 onChange
+    if (!file) return;
+    setUploading(true);
+    setBgError('');
+    try {
+      const dataUrl = await resizeImageFile(file);
+      onSetBgImage(dataUrl);
+    } catch (err) {
+      setBgError(t.customBgError);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const dateStr = ev.targetDate.toLocaleDateString(LOCALE_MAP[lang], { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+  const origDateStr = ev.date ? new Date(`${ev.date}T00:00:00`).toLocaleDateString(LOCALE_MAP[lang]) : '';
+  const showOrigDate = !!ev.repeat && origDateStr && origDateStr !== dateStr;
+  const altCalendarStr = ev.calendar && ev.calendar !== 'gregory' ? formatAltCalendar(ev.targetDate, ev.calendar, lang, t) : '';
+
+  // 匯出成圖片：使用者先選格式（卡片 / 限動），再實際產生 PNG 並分享或下載
+  const [exportFormat, setExportFormat] = useState('card'); // 'card' | 'story'
+  const [showExportPanel, setShowExportPanel] = useState(false); // 「匯出成圖片」收合面板，跟「更換圖片」同一排的 icon 按鈕觸發
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError('');
+    try {
+      const exportEv = { ...ev, dateStr, origDateStr, showOrigDate, altCalendarStr, numberFontFamily, numberFontVariation };
+      const { blob, filename } = await exportEventCardImage(exportEv, lang, t, isDark, exportFormat);
+      await shareOrDownloadImage(blob, filename, t);
+    } catch (err) {
+      setExportError(t.exportError);
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div
+      className={dock ? 'relative h-full w-full' : 'fixed inset-0 flex items-center justify-center px-6'}
+      style={dock ? undefined : { zIndex: 200, background: shown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)', transition: `background ${CLOSE_DURATION}ms ease`, touchAction: 'none' }}
+      onClick={dock ? undefined : handleClose}
+      onTouchMove={dock ? undefined : (e => { if (e.target === e.currentTarget) e.preventDefault(); })}
+    >
+      {/* 極簡透明度滑桿：細軌道＋小圓形滑塊，與卡片 UI 保持一致。
+          滑桿只代表「遮罩顯隱程度」，不會改變 backdrop-filter 的模糊強度。 */}
+      <style>{`
+        .premium-range {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 100%;
+          height: 18px;
+          margin: 0;
+          padding: 0;
+          border-radius: 999px;
+          outline: none;
+          cursor: pointer;
+          background: transparent;
+        }
+        .premium-range::-webkit-slider-runnable-track {
+          height: 3px;
+          border-radius: 999px;
+          background: transparent;
+        }
+        .premium-range::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          width: 14px;
+          height: 14px;
+          margin-top: -5.5px;
+          border: 1px solid rgba(255,255,255,0.88);
+          border-radius: 50%;
+          background: rgba(255,255,255,0.96);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.16);
+          transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        .premium-range::-webkit-slider-thumb:active {
+          transform: scale(1.06);
+          box-shadow: 0 1px 5px rgba(0,0,0,0.2), 0 0 0 4px rgba(108,123,224,0.12);
+        }
+        .premium-range::-moz-range-track {
+          height: 3px;
+          border-radius: 999px;
+          background: transparent;
+        }
+        .premium-range::-moz-range-progress {
+          height: 3px;
+          border-radius: 999px;
+          background: ${ACCENT};
+        }
+        .premium-range::-moz-range-thumb {
+          width: 14px;
+          height: 14px;
+          border: 1px solid rgba(255,255,255,0.88);
+          border-radius: 50%;
+          background: rgba(255,255,255,0.96);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.16);
+          transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+        .premium-range::-moz-range-thumb:active {
+          transform: scale(1.06);
+        }
+        .premium-range:focus-visible {
+          outline: 2px solid ${ACCENT}55;
+          outline-offset: 3px;
+        }
+        /* 匯出格式滑塊開關：卡片／限動(9:16) 兩個選項用會滑動的膠囊背景表示目前選中哪一個 */
+        .export-format-toggle {
+          position: relative;
+          display: flex;
+          padding: 3px;
+          border-radius: 999px;
+          background: var(--card-border);
+        }
+        .export-format-toggle .toggle-thumb {
+          position: absolute;
+          top: 3px;
+          bottom: 3px;
+          border-radius: 999px;
+          background: ${ACCENT};
+          box-shadow: 0 2px 8px rgba(108,123,224,0.35);
+          transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .export-format-toggle button {
+          position: relative;
+          z-index: 1;
+          flex: 1;
+          background: transparent;
+          transition: color 0.2s ease;
+        }
+        /* 數字字體橫向捲動選單：隱藏卷軸但保留可捲動手感（webkit／Firefox 都處理） */
+        .font-scroll::-webkit-scrollbar { display: none; }
+        .font-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+      `}</style>
+      <div
+        className={dock ? 'relative w-full h-full rounded-3xl' : 'relative w-full max-w-sm max-h-[85vh] rounded-3xl'}
+        style={{
+          opacity: shown ? 1 : 0,
+          // dock（分欄右側面板）模式下改成從右邊帶點彈性地「彈射」滑入；非 dock（手機置中彈窗）維持原本由下往上彈出的效果
+          transform: shown
+            ? 'scale(1) translateX(0px) translateY(0px)'
+            : dock ? 'scale(0.94) translateX(28px) translateY(0px)' : 'scale(0.92) translateX(0px) translateY(14px)',
+          transition: `opacity ${CLOSE_DURATION}ms ease, transform ${CLOSE_DURATION}ms cubic-bezier(0.34, 1.56, 0.64, 1)`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 自訂背景圖片：最底層。圖片本身完全不跟著滑桿改變透明度。 */}
+        {ev.bgImage && (
+          <img
+            src={ev.bgImage}
+            alt=""
+            className="absolute inset-0 w-full h-full rounded-3xl"
+            style={{
+              objectFit: 'cover',
+              zIndex: 0,
+              display: 'block',
+            }}
+          />
+        )}
+
+        {/* 玻璃效果層：正常模式固定輕度模糊；點擊「原圖」按鈕進入原圖模式後，整層完全移除。 */}
+        {ev.bgImage && !glassCleared && (
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none"
+            style={{
+              zIndex: 1,
+              backdropFilter: 'blur(10px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(10px) saturate(180%)',
+            }}
+          />
+        )}
+
+        {/* 唯一受滑桿控制的白色遮罩：滑桿數值 0～100 對應遮罩從完全不透明到完全消失。 */}
+        {ev.bgImage && !glassCleared && (
+          <div
+            className="absolute inset-0 rounded-3xl pointer-events-none"
+            style={{
+              zIndex: 2,
+              background: `rgba(255,255,255,${bgOpacity})`,
+              transition: 'background 90ms linear',
+            }}
+          />
+        )}
+
+        <div className={dock ? 'relative w-full h-full overflow-y-auto rounded-3xl p-5 flex flex-col' : 'relative w-full max-h-[85vh] overflow-y-auto rounded-3xl p-5 flex flex-col'} style={{
+          ...AUTH_GLASS,
+          // 有背景圖片時，內容層保持完全透明，讓底下的照片／固定模糊／可調遮罩獨立顯示；
+          // 沒有背景圖片時，維持卡片本身的毛玻璃底色（透明度固定 25，即 75% 不透明）。
+          background: ev.bgImage ? 'transparent' : `rgba(255,255,255,${NO_IMAGE_CARD_OPACITY})`,
+          backdropFilter: ev.bgImage ? 'none' : AUTH_GLASS.backdropFilter,
+          WebkitBackdropFilter: ev.bgImage ? 'none' : AUTH_GLASS.WebkitBackdropFilter,
+          zIndex: 3,
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
+        }}>
+          {/* 有自訂背景時不再疊加額外彩色光暈，避免遮住背景圖片；沒有背景時才保留原本的柔光。 */}
+          {!ev.bgImage && (
+            <>
+              <div className="absolute pointer-events-none" style={{ width: '55%', aspectRatio: '1', top: '-18%', right: '-15%', background: `${colorHex(ev.colorId)}22`, filter: 'blur(50px)', borderRadius: '50%', zIndex: 0 }} />
+              <div className="absolute pointer-events-none" style={{ width: '45%', aspectRatio: '1', bottom: '-12%', left: '-12%', background: `${colorHex(ev.colorId)}15`, filter: 'blur(50px)', borderRadius: '50%', zIndex: 0 }} />
+            </>
+          )}
+
+          {/* 左上角：事件圖示＋標題／日期，樣式比照倒數卡片設計 */}
+          <div className="w-full flex items-start justify-between gap-2 relative" style={{ zIndex: 1 }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className="flex items-center justify-center flex-shrink-0 rounded-2xl"
+                style={{ width: 46, height: 46, background: `${colorHex(ev.colorId)}1c`, fontSize: 22, boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.6)' }}
+              >
+                {ev.icon}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-bold truncate" style={{ color: cardInk, fontSize: 17, letterSpacing: '-0.01em' }}>{ev.title}</h3>
+                  {/* 生日徽章：XX歲生日，緊跟在事件名稱後面 */}
+                  {ev.age !== null && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
+                      {t.ageBadge(ev.age)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs truncate mt-0.5" style={{ color: cardInkSoft }}>{dateStr}</p>
+              </div>
+            </div>
+            <button onClick={handleClose} aria-label={t.close} style={{ color: cardInkSoft, flexShrink: 0 }}><X size={18} /></button>
+          </div>
+
+          {/* 次要標籤：顏色標記／生日／關懷／重複頻率／農曆日期，全部統一做成徽章樣式 */}
+          <div className="flex items-center gap-2 flex-wrap mt-2 relative" style={{ zIndex: 1 }}>
+            <span className="inline-flex items-center gap-1 text-xs font-bold flex-shrink-0" style={{ color: cardInkSoft }}>
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorHex(ev.colorId) }} />
+              {t.markerColorLabel}
+            </span>
+            {ev.isBirthday ? (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${ACCENT}20`, color: ACCENT }}>{t.birthdayLabel}</span>
+            ) : ev.isCare ? (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--card-border)', color: INK_SOFT }}>{t.careLabel}</span>
+            ) : null}
+            {/* 生日模式下重複頻率固定是「每年」，跟生日徽章意思重複，所以隱藏不畫；
+                隱藏後，後面的曆法徽章會因為 flex 排列自動往前補上，不用額外處理位置 */}
+            {ev.repeat && !ev.isBirthday && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'var(--card-border)', color: INK_SOFT }}>
+                {ev.repeatUnit === 'month' ? t.monthlyBadge(ev.repeatInterval) : t.yearlyBadge(ev.repeatInterval)}
+              </span>
+            )}
+            {altCalendarStr && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${ACCENT}20`, color: ACCENT }}>
+                {altCalendarStr}
+              </span>
+            )}
+          </div>
+
+          {/* 中央超大剩餘天數，樣式比照倒數卡片設計：漸層大數字＋兩側分隔線的說明文字（數字再放大一階） */}
+          <div className="flex flex-col items-center justify-center relative" style={{ zIndex: 1, padding: '38px 0 26px' }}>
+            <div
+              style={{
+                fontSize: 'clamp(88px, 22vw, 144px)',
+                lineHeight: 0.85,
+                fontWeight: 500,
+                letterSpacing: '-0.04em',
+                fontFamily: numberFontFamily,
+                fontVariationSettings: numberFontVariation,
+                background: `linear-gradient(135deg, ${colorHex(ev.colorId)}, ${colorHex(ev.colorId)}aa)`,
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+                filter: `drop-shadow(0 8px 20px ${colorHex(ev.colorId)}33)`,
+                transition: 'font-family 0.15s ease',
+              }}
+            >
+              {ev.diffDays === 0 ? '🎉' : Math.abs(ev.diffDays)}
+            </div>
+            <div className="flex items-center gap-4 mt-3" style={{ color: cardInkSoft, fontSize: 14, fontWeight: 500 }}>
+              <span style={{ width: 30, height: 1, background: 'var(--card-border)' }} />
+              <span>{ev.diffDays === 0 ? t.today : ev.diffDays > 0 ? t.daysLeft(ev.diffDays) : t.daysAgo(Math.abs(ev.diffDays))}</span>
+              <span style={{ width: 30, height: 1, background: 'var(--card-border)' }} />
+            </div>
+          </div>
+
+          {showOrigDate && (
+            <div className="p-3 rounded-xl relative" style={{ background: CARD_BG, border: CARD_BORDER, zIndex: 1 }}>
+              <div className="text-xs" style={{ color: INK_SOFT }}>{t.originalDate}：{origDateStr}</div>
+            </div>
+          )}
+
+          {/* 二級功能列：「自定義」（齒輪＋文字）收合卡片背景／數字字體等次要設定；
+              「分享」icon 按鈕維持在同一排、獨立展開匯出面板 */}
+          <div className="mt-5 pt-4 flex items-center gap-2 relative" style={{ borderTop: CARD_BORDER, zIndex: 1 }}>
+            <button
+              onClick={() => setShowCustomizePanel(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold flex-shrink-0"
+              style={{ background: showCustomizePanel ? ACCENT : 'var(--card-border)', color: showCustomizePanel ? '#fff' : INK_SOFT, boxShadow: '0 2px 14px rgba(255,255,255,0.55)' }}
+            >
+              <Settings size={15} />
+              {t.customizeLabel}
+            </button>
+            {/* 匯出成圖片：獨立 icon 按鈕，點了展開下方的格式選擇＋分享面板 */}
+            <button
+              onClick={() => setShowExportPanel(v => !v)}
+              aria-label={t.exportLabel}
+              title={t.exportLabel}
+              className="p-2 rounded-lg flex items-center justify-center flex-shrink-0 ml-auto"
+              style={{ background: showExportPanel ? ACCENT : 'var(--card-border)', color: showExportPanel ? '#fff' : INK_SOFT, width: 36, height: 36, boxShadow: '0 2px 14px rgba(255,255,255,0.55)' }}
+            >
+              <Share2 size={15} />
+            </button>
+          </div>
+
+          {/* 「自定義」二級面板：預設收合，點擊齒輪按鈕後視窗縱向加長展開，
+              裡面包含「更換卡片背景」與「更換數字字體」兩個欄目 */}
+          <div
+            className="relative"
+            style={{
+              zIndex: 1,
+              maxHeight: showCustomizePanel ? 640 : 0,
+              opacity: showCustomizePanel ? 1 : 0,
+              marginTop: showCustomizePanel ? 14 : 0,
+              overflow: 'hidden',
+              transition: 'max-height 180ms cubic-bezier(0.22, 1, 0.36, 1), opacity 130ms ease, margin-top 160ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            {/* 更換卡片背景：上傳／更換／移除，圖片會先在瀏覽器端等比縮小再存起來，避免佔用太多空間 */}
+            <div className="pb-4" style={{ borderBottom: CARD_BORDER }}>
+              <div className="text-xs font-bold mb-2" style={{ color: cardInkSoft }}>{t.customBgLabel}</div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  disabled={uploading}
+                  className="px-4 py-2 rounded-lg text-sm font-bold flex-shrink-0"
+                  style={{ background: MINT, color: '#fff', opacity: uploading ? 0.6 : 1 }}
+                >
+                  {uploading ? t.customBgUploading : ev.bgImage ? t.customBgChange : t.customBgUpload}
+                </button>
+                {ev.bgImage && !uploading && (
+                  <>
+                    <button
+                      onClick={() => onSetBgImage(null)}
+                      className="px-3 py-2 rounded-lg text-sm font-bold flex-shrink-0"
+                      style={{ background: 'rgba(255,0,74,0.12)', color: DANGER }}
+                    >
+                      {t.customBgRemove}
+                    </button>
+                    {/* 調節按鈕：切換下方「調節透明度」面板的展開／收合 */}
+                    <button
+                      onClick={() => setShowOpacityAdjust(v => !v)}
+                      aria-label={t.adjustBgOpacity}
+                      title={t.adjustBgOpacity}
+                      className="p-2 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: showOpacityAdjust ? ACCENT : 'var(--card-border)', color: showOpacityAdjust ? '#fff' : INK_SOFT, width: 36, height: 36 }}
+                    >
+                      <SlidersHorizontal size={15} />
+                    </button>
+                  </>
+                )}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              {bgError && <p className="text-xs font-medium mt-2" style={{ color: DANGER }}>{bgError}</p>}
+
+              {/* 調節透明遮罩面板：只有設定過自訂背景圖片時才可能展開，
+                  用 max-height + opacity 過渡讓視窗高度變化看起來絲滑，而不是瞬間跳動 */}
+              {ev.bgImage && (
+                <div
+                  style={{
+                    maxHeight: showOpacityAdjust ? 92 : 0,
+                    opacity: showOpacityAdjust ? 1 : 0,
+                    marginTop: showOpacityAdjust ? 14 : 0,
+                    overflow: 'hidden',
+                    transition: 'max-height 170ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, margin-top 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+                  }}
+                >
+                  <div className="text-xs font-bold mb-2" style={{ color: cardInkSoft }}>
+                    {t.dragToAdjustOpacity}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1" style={{ paddingTop: 20 }}>
+                      {/* 拖動滑桿時，在滑塊正上方浮出目前的透明度數值（0～100），放開才收起 */}
+                      {sliderDragging && !glassCleared && (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            position: 'absolute',
+                            left: `${overlaySliderValue}%`,
+                            transform: 'translateX(-50%)',
+                            top: 0,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#fff',
+                            background: ACCENT,
+                            padding: '2px 6px',
+                            borderRadius: 6,
+                            pointerEvents: 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >{overlaySliderValue}</span>
+                      )}
+                      <input
+                        type="range"
+                        min={0}
+                        max={SLIDER_MAX}
+                        step={1}
+                        value={overlaySliderValue}
+                        disabled={glassCleared}
+                        onMouseDown={() => setSliderDragging(true)}
+                        onTouchStart={() => setSliderDragging(true)}
+                        onChange={e => {
+                          const sliderValue = Number(e.target.value);
+                          onSetBgOpacity(1 - sliderValue / SLIDER_MAX);
+                        }}
+                        className="w-full premium-range"
+                        aria-label={t.adjustBgOpacity}
+                        style={{
+                          // 實色軌道：左側（已調整部分）用實色主色，右側用實色的淺灰，不再使用半透明色。
+                          background: `linear-gradient(to right, ${ACCENT} 0%, ${ACCENT} ${overlaySliderValue}%, var(--card-border) ${overlaySliderValue}%, var(--card-border) 100%)`,
+                          opacity: glassCleared ? 0.4 : 1,
+                        }}
+                      />
+                    </div>
+                    {/* 「原圖」：獨立的長條形按鈕，取代原本滑桿裡 100～120 那段隱藏區間。
+                        點一下切換成原圖模式（不模糊、不加遮罩）；再點一下則還原成切換前的透明度。 */}
+                    <button
+                      type="button"
+                      onClick={toggleOriginalImage}
+                      className="flex-shrink-0 rounded-full text-xs font-bold"
+                      style={{
+                        padding: '7px 14px',
+                        background: glassCleared ? ACCENT : 'var(--card-border)',
+                        color: glassCleared ? '#fff' : INK_SOFT,
+                        transition: 'background 120ms ease, color 120ms ease',
+                      }}
+                    >
+                      {originalImageLabel}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 更換數字字體：橫向可捲動的字卡（方案 A＋B 合併）——每張卡直接用該字體渲染樣本數字，
+                一眼看出實際效果，同時用橫向捲動不佔垂直空間，未來要加更多字體只要往 NUMBER_FONTS 加項目即可 */}
+            <div className="pt-4">
+              <div className="text-xs font-bold mb-2" style={{ color: cardInkSoft }}>{t.customFontLabel}</div>
+              <div className="font-scroll flex items-center gap-2.5 overflow-x-auto pb-1">
+                {NUMBER_FONTS.map(f => {
+                  const active = numberFontId === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => onSetNumberFont(f.id)}
+                      className="relative flex flex-col items-center justify-center rounded-2xl flex-shrink-0"
+                      style={{
+                        width: 68, height: 68,
+                        background: active ? `${colorHex(ev.colorId)}18` : CARD_BG,
+                        border: active ? `1.5px solid ${colorHex(ev.colorId)}` : CARD_BORDER,
+                        boxShadow: '0 2px 14px rgba(255,255,255,0.55)',
+                        transition: 'border-color 0.15s ease, background 0.15s ease',
+                      }}
+                    >
+                      {active && (
+                        <span
+                          className="absolute flex items-center justify-center rounded-full"
+                          style={{ top: 4, right: 4, width: 14, height: 14, background: colorHex(ev.colorId), color: '#fff', fontSize: 8, fontWeight: 900 }}
+                        >
+                          ✓
+                        </span>
+                      )}
+                      <span style={{ fontFamily: f.family, fontVariationSettings: f.variationSettings || 'normal', fontSize: 22, fontWeight: 700, lineHeight: 1, color: INK }}>88</span>
+                      <span className="mt-1.5" style={{ fontSize: 9, fontWeight: 700, color: INK_SOFT }}>{f.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* 匯出成圖片面板：點右上角分享 icon 展開 */}
+          <div
+            className="relative"
+            style={{
+              zIndex: 1,
+              maxHeight: showExportPanel ? 160 : 0,
+              opacity: showExportPanel ? 1 : 0,
+              marginTop: showExportPanel ? 14 : 0,
+              overflow: 'hidden',
+              transition: 'max-height 170ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, margin-top 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            <div className="text-xs font-bold mb-2" style={{ color: cardInkSoft }}>{t.exportLabel}</div>
+            {/* 「卡片／限動(9:16)」格式選擇：改成會滑動的膠囊開關，一整條寬度切一半，
+                選中的一側用會平滑滑動的實心背景表示，比原本兩顆各自變色的按鈕更有質感 */}
+            <div className="export-format-toggle mb-3">
+              <div
+                className="toggle-thumb"
+                style={{ left: 3, right: '50%', transform: exportFormat === 'story' ? 'translateX(100%)' : 'translateX(0%)' }}
+              />
+              <button
+                onClick={() => setExportFormat('card')}
+                className="px-3 py-2 rounded-full text-sm font-bold"
+                style={{ color: exportFormat === 'card' ? '#fff' : INK_SOFT }}
+              >
+                {t.exportFormatCard}
+              </button>
+              <button
+                onClick={() => setExportFormat('story')}
+                className="px-3 py-2 rounded-full text-sm font-bold"
+                style={{ color: exportFormat === 'story' ? '#fff' : INK_SOFT }}
+              >
+                {t.exportFormatStory}
+              </button>
+            </div>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="w-full px-3 py-2.5 rounded-lg text-sm font-bold"
+              style={{ background: ACCENT, color: '#fff', opacity: exporting ? 0.6 : 1 }}
+            >
+              {exporting ? t.exportPreparing : t.exportShareButton}
+            </button>
+            {exportError && <p className="text-xs font-medium mt-2" style={{ color: DANGER }}>{exportError}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PastEventsAnimatedSection({ show, events, renderEventCard }) {
+  const contentRef = useRef(null);
+  const [height, setHeight] = useState(0);
+
+  // 量測內容高度：只有在「展開」狀態才把量到的高度套用回 state。
+  // 修正前這裡不論目前是否展開都會呼叫 measure()，而 ResizeObserver 第一次的回呼
+  // 是非同步的，常常會晚於下面「收合」那個 effect 才觸發，導致每次進入頁面（元件重新掛載、
+  // events.length 改變）都被非同步地重新展開成完整高度，即使 showPast 其實是 false，
+  // 也因此在畫面上「自動預留」出一大塊看不見但仍佔位的空白區域。收合時完全不採用量到的高度，
+  // 就不會再發生這個問題。
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const measure = () => { if (show) setHeight(el.scrollHeight); };
+    measure();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+  }, [events.length, show]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    if (show) {
+      requestAnimationFrame(() => setHeight(el.scrollHeight));
+    } else {
+      setHeight(0);
+    }
+  }, [show]);
+
+  // 圓點指示器靠負 left 位移「掛」在軸線上，最左會超出卡片本身的邊界約 25px。
+  // CSS 規定只要 overflow-x／overflow-y 其中一個是 hidden、另一個是 visible，
+  // visible 那一軸會被瀏覽器強制轉成 auto——而 auto 一樣會把超出範圍的內容裁掉，
+  // 並不會真的「可見」，這就是圓點完全消失的原因。改成左側額外留一段 padding
+  // （比圓點超出的量再寬一點）＋等量的負 margin 抵銷位置，讓圓點落在裁切框「裡面」，
+  // 這樣兩軸都可以放心用同一個 overflow: hidden，圓點也不會再被裁掉。
+  const DOT_SAFE_INSET = 30;
+
+  return (
+    <div
+      className="relative"
+      style={{
+        height,
+        opacity: show ? 1 : 0,
+        // 展開時在區塊下方留出跟「事件卡片與卡片之間」一致的間距，銜接下方的未來地標清單；
+        // 收合時完全不佔位，維持跟按鈕之間原本的間距。
+        marginBottom: show ? EVENT_CARD_GAP : 0,
+        marginLeft: -DOT_SAFE_INSET,
+        paddingLeft: DOT_SAFE_INSET,
+        transform: show ? 'translateY(0)' : 'translateY(-6px)',
+        pointerEvents: show ? 'auto' : 'none',
+        overflow: 'hidden',
+        transition: 'height 160ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 110ms ease, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), margin-bottom 160ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+        willChange: 'height, opacity, transform',
+      }}
+    >
+      {/* flex + gap 統一控制卡片間距，不再依賴每張卡片自己的 margin-bottom——
+          margin 在「最後一張卡片」是否會被父層 scrollHeight 量進去，不同瀏覽器行為不一致，
+          容易導致收合區塊跟下方未來地標之間的間隙忽大忽小；gap 不會有這個問題。 */}
+      <div ref={contentRef} className="relative flex flex-col" style={{ zIndex: 0, gap: EVENT_CARD_GAP }}>
+        {events.map(renderEventCard)}
+      </div>
+    </div>
+  );
+}
+
+function TimelineSection({
+  events, setEvents, lang, t, now, isDark, customIcons, setCustomIcons,
+  onHeaderDragStart, onHeaderDragMove, onHeaderDragEnd,
+  isLargeScreen = false, viewingId, setViewingId,
+}) {
+  const [showForm, setShowForm] = useState(false);
+  // 新增／編輯地標視窗的顯示階段：保留 mounted 狀態直到關閉動畫完成，
+  // 這樣視窗不會在關閉瞬間消失。
+  const [formPhase, setFormPhase] = useState('hidden'); // hidden -> enter -> shown -> closing
+  const FORM_MODAL_DURATION = 150;
+  function openForm() {
+    setShowForm(true);
+    setFormPhase('enter');
+    requestAnimationFrame(() => setFormPhase('shown'));
+  }
+  function closeForm() {
+    if (!showForm || formPhase === 'closing') return;
+    setFormPhase('closing');
+    setTimeout(() => {
+      setShowForm(false);
+      resetForm();
+      setFormPhase('hidden');
+    }, FORM_MODAL_DURATION);
+  }
+  // 刪除地標前的二次確認：存的是「待刪除」那筆事件的 id，不是布林值，
+  // 這樣彈窗裡才能顯示出具體是哪一筆（標題），跟帳號那邊「刪除帳號」用的是同一套風格
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleteModalPhase, setDeleteModalPhase] = useState('hidden');
+  const DELETE_MODAL_DURATION = 130;
+  function openDeleteConfirm(id) {
+    setConfirmDeleteId(id);
+    setDeleteModalPhase('enter');
+    requestAnimationFrame(() => setDeleteModalPhase('shown'));
+  }
+  function closeDeleteConfirm() {
+    if (deleteModalPhase === 'closing') return;
+    setDeleteModalPhase('closing');
+    setTimeout(() => {
+      setConfirmDeleteId(null);
+      setDeleteModalPhase('hidden');
+    }, DELETE_MODAL_DURATION);
+  }
+  // 「新增地標」視窗的高度動畫：視窗裡的內容會隨「重複」「生日模式」「關懷模式」「自訂圖示」等
+  // 開關而增減欄位，原本這些欄位一出現／消失，視窗高度就是直接「跳」一下，很不流暢。
+  // CSS 沒辦法直接對 height:auto 做 transition，所以用 ResizeObserver 量出內容目前的實際高度，
+  // 存進 state 給外層容器當作明確的像素高度，再用 CSS transition 讓高度變化平滑過渡；
+  // 內容本身的實際排版還是自然的 auto 高度，只是外層多包一層拿這個量出來的值做動畫。
+  const formContentRef = useRef(null);
+  const [formHeight, setFormHeight] = useState(null);
+  useEffect(() => {
+    const el = formContentRef.current;
+    if (!el || !showForm) return;
+    setFormHeight(el.scrollHeight);
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) setFormHeight(entry.target.scrollHeight);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [showForm]);
+  const [editingId, setEditingId] = useState(null);
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState('');
+  const [icon, setIcon] = useState(ICONS[0]);
+  const [openIconSubmenu, setOpenIconSubmenu] = useState(null); // 目前展開子菜單的母菜單 key
+  const [showCustomIconPanel, setShowCustomIconPanel] = useState(false);
+  const [customIconInput, setCustomIconInput] = useState('');
+  const [customIconError, setCustomIconError] = useState('');
+  const [colorId, setColorId] = useState(COLOR_TAGS[0].id);
+  const [calendar, setCalendar] = useState('gregory');
+  const [repeat, setRepeat] = useState(false);
+  const [repeatUnit, setRepeatUnit] = useState('year');
+  const [repeatInterval, setRepeatInterval] = useState(1);
+  const [isBirthday, setIsBirthday] = useState(false);
+  const [isCare, setIsCare] = useState(false);
+  const [careCustomIcon, setCareCustomIcon] = useState(null); // 關懷模式第三格「自選」圖示，是單一一格、跟平常的自訂圖示清單分開
+  // 開啟關懷模式時暫存原本選的圖示／顏色，關掉時還原，避免使用者原本選好的東西憑空消失
+  const prevIconRef = useRef(ICONS[0]);
+  const prevColorRef = useRef(COLOR_TAGS[0].id);
+  function toggleCare() {
+    setIsCare(prev => {
+      const next = !prev;
+      if (next) {
+        setIsBirthday(false); // 生日模式與關懷模式不應同時開啟，開啟關懷模式時自動關掉生日模式
+        prevIconRef.current = icon;
+        prevColorRef.current = colorId;
+        setIcon(CARE_ICONS[0]);
+        setColorId(CARE_COLOR_TAGS[0].id);
+      } else {
+        setIcon(prevIconRef.current);
+        setColorId(prevColorRef.current);
+      }
+      return next;
+    });
+  }
+  function toggleBirthday() {
+    setIsBirthday(prev => {
+      const next = !prev;
+      // 同上，開啟生日模式時若關懷模式原本是開著的，要連同關懷模式暫存的圖示／顏色一起還原並關閉
+      if (next && isCare) {
+        setIcon(prevIconRef.current);
+        setColorId(prevColorRef.current);
+        setIsCare(false);
+      }
+      return next;
+    });
+  }
+  function toggleRepeat() {
+    setRepeat(prev => {
+      const next = !prev;
+      if (!next) {
+        // 關閉「重複」時，生日模式／關懷模式的開關本身也會一併收合消失，
+        // 所以兩者都要自動一起關閉，避免下次重新展開「重複」時殘留上次開啟的狀態
+        setIsBirthday(false);
+        if (isCare) {
+          setIcon(prevIconRef.current);
+          setColorId(prevColorRef.current);
+          setIsCare(false);
+        }
+      }
+      return next;
+    });
+  }
+  const [formSession, setFormSession] = useState(0);
+  const [showPast, setShowPast] = useState(false); // 過去的地標預設收合，讓最近的未來地標永遠排在第一個
+  const [searchOpen, setSearchOpen] = useState(false);
+  // 目前開啟「地標詳情」視窗的事件 id：改由上層 App 持有／傳入（見 App 內的 viewingId／setViewingId），
+  // 而不是這裡自己 useState——大屏分欄模式下，這個視窗不再是蓋在畫面正中央的彈窗，
+  // 而是要嵌進右側面板顯示，且時間軸本身也要挪到左側，這些都需要 App 知道「目前有沒有正在看哪個地標」。
+  const [searchQuery, setSearchQuery] = useState('');
+  const listRef = useRef(null); // 時間軸清單自己的捲動容器（獨立於整頁）
+
+  // 只有在「新增地標」視窗開著、且使用者勾選了「關懷模式」時，才把畫面變成灰階，
+  // 用意是紀念／追悼情境下讓介面呈現素雅一點；一般情況（包含表單開著但沒開關懷模式）維持原本色彩。
+  // 灰階套用在 header 跟世界時鐘整個區塊（含次要時區清單、按鈕、卡片邊框等），
+  // 但「不含國旗」——國旗改用 FlagPortal 另外用 createPortal 掛到 document.body 底下獨立渲染，
+  // 不在被套上 filter 的祖先層級裡，所以不會被一起變灰（CSS 的 filter 沒辦法讓子元素自己「跳出」）。
+  // 時間軸則刻意排除在灰階範圍之外——地標本身的顏色標籤是使用者自己設定的內容，
+  // 開啟關懷模式只是在「填表單」這件事上營造素雅氣氛，不應該連帶影響其他既有地標的顏色。
+  // 視窗本身用 createPortal 掛在 document.body 底下，也不在灰階範圍裡，所以同樣不受影響。
+  useEffect(() => {
+    const headerEl = document.querySelector('header');
+    const worldClockEl = document.getElementById('world-clock-section-root');
+    const targets = [headerEl, worldClockEl].filter(Boolean);
+    const shouldGray = showForm && isCare;
+    targets.forEach(el => { el.style.filter = shouldGray ? 'grayscale(1)' : ''; });
+    return () => { targets.forEach(el => { el.style.filter = ''; }); };
+  }, [showForm, isCare]);
+
+  function resetForm() {
+    setEditingId(null);
+    setTitle('');
+    setDate('');
+    setIcon(ICONS[0]);
+    setOpenIconSubmenu(null);
+    setShowCustomIconPanel(false);
+    setCustomIconInput('');
+    setCustomIconError('');
+    setColorId(COLOR_TAGS[0].id);
+    setCalendar('gregory');
+    setRepeat(false);
+    setRepeatUnit('year');
+    setRepeatInterval(1);
+    setIsBirthday(false);
+    setIsCare(false);
+    setCareCustomIcon(null);
+  }
+
+  function toggleForm() {
+    if (showForm) {
+      closeForm();
+    } else {
+      setFormSession(s => s + 1);
+      openForm();
+    }
+  }
+
+  // Shift+C 快速呼出「新增地標」表單：
+  // 只在「目前沒有選取文字、也沒有把焦點放在輸入框／可編輯區塊」時才攔截。
+  // 不再攔截 Ctrl+C / Cmd+C，避免影響系統原生複製功能。
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key !== 'c' && e.key !== 'C') return;
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target;
+      const isEditable = target && (
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      );
+      if (isEditable) return;
+      const selection = typeof window !== 'undefined' ? window.getSelection() : null;
+      if (selection && selection.toString().length > 0) return; // 使用者正要複製選取的文字，不攔截
+      if (showForm) return; // 表單已經開著（新增或編輯中），不重複處理
+      e.preventDefault();
+      setFormSession(s => s + 1);
+      openForm();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showForm]);
+
+  function startEdit(ev) {
+    setEditingId(ev.id);
+    setTitle(ev.title);
+    setDate(ev.date);
+    setIcon(ev.icon);
+    setOpenIconSubmenu(null);
+    setColorId(ev.colorId);
+    setCalendar(ev.calendar || 'gregory');
+    setRepeat(!!ev.repeat);
+    setRepeatUnit(ev.repeatUnit || 'year');
+    setRepeatInterval(ev.repeatInterval || 1);
+    setIsBirthday(!!ev.isBirthday);
+    setIsCare(!!ev.isCare);
+    setCareCustomIcon(ev.careCustomIcon || null);
+    setFormSession(s => s + 1);
+    openForm();
+  }
+
+  function handleAddCustomIcon() {
+    const value = customIconInput.trim();
+    if (!value) return;
+    if (customIcons.includes(value)) {
+      // 已存在的自訂 emoji，直接選用即可
+      setIcon(value);
+      setOpenIconSubmenu(null);
+      setCustomIconInput('');
+      setCustomIconError('');
+      return;
+    }
+    if (customIcons.length >= 30) {
+      setCustomIconError(t.customIconLimit);
+      return;
+    }
+    setCustomIcons(prev => [...prev, value]);
+    setIcon(value);
+    setOpenIconSubmenu(null);
+    setCustomIconInput('');
+    setCustomIconError('');
+  }
+
+  // 關懷模式專用：只維護「一格」自選圖示，不像平常的自訂圖示會一直往清單裡加
+  function handleSetCareCustomIcon() {
+    const value = customIconInput.trim();
+    if (!value) return;
+    setCareCustomIcon(value);
+    setIcon(value);
+    setShowCustomIconPanel(false);
+    setCustomIconInput('');
+    setCustomIconError('');
+  }
+
+  function handleRemoveCustomIcon(value) {
+    setCustomIcons(prev => prev.filter(v => v !== value));
+  }
+
+  function handleAdd() {
+    if (!title || !date) {
+      alert(t.fillRequired);
+      return;
+    }
+    const eventData = {
+      title,
+      date,
+      time: '',
+      icon,
+      colorId,
+      calendar,
+      repeat,
+      repeatUnit: calendar !== 'gregory' ? 'year' : repeatUnit,
+      repeatInterval: Math.max(1, parseInt(repeatInterval) || 1),
+      isBirthday: repeat && isBirthday,
+      isCare,
+      careCustomIcon: isCare ? careCustomIcon : null,
+    };
+    if (editingId) {
+      setEvents(prev => prev.map(e => (e.id === editingId ? { ...e, ...eventData } : e)));
+    } else {
+      setEvents(prev => [...prev, { id: Date.now().toString(), ...eventData }]);
+    }
+    closeForm();
+  }
+
+  function deleteEvent(id) {
+    setEvents(prev => prev.filter(e => e.id !== id));
+    if (editingId === id) { closeForm(); }
+  }
+
+  // 「地標詳情」視窗裡上傳／移除自訂卡片背景，直接存進對應事件的 bgImage 欄位，
+  // 沿用既有的 events -> window.storage 自動儲存機制，不用另外處理持久化
+  function setEventBgImage(id, dataUrlOrNull) {
+    setEvents(prev => prev.map(e => (e.id === id ? { ...e, bgImage: dataUrlOrNull } : e)));
+  }
+
+  // 「地標詳情」視窗裡調整自訂背景的透明遮罩不透明度（0～1）。
+  // 注意：這裡只控制遮罩，卡片的 backdrop-filter blur 保持固定，不受滑桿影響。
+  function setEventBgOpacity(id, opacity) {
+    setEvents(prev => prev.map(e => (e.id === id ? { ...e, bgOverlayOpacity: opacity } : e)));
+  }
+
+  // 「地標詳情」視窗裡切換大數字的字體，存進事件的 numberFont 欄位（存字體 id，不存字型本身）
+  function setEventNumberFont(id, fontId) {
+    setEvents(prev => prev.map(e => (e.id === id ? { ...e, numberFont: fontId } : e)));
+  }
+
+  // 計算每個事件的有效日期與差異天數
+  const processedEvents = events.map(ev => {
+    const targetDate = getEffectiveDate(ev, now);
+    // 簡單的天數計算（忽略時分秒的精確度，以本地日期為基準）
+    const targetTime = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+    const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const diffDays = Math.ceil((targetTime - todayTime) / (1000 * 60 * 60 * 24));
+
+    // 生日模式：以新增時設定的日期為出生日，計算下一次生日是幾歲
+    let age = null;
+    if (ev.isBirthday && ev.repeat) {
+      const origDate = combineDateTime(ev.date, ev.time);
+      age = targetDate.getFullYear() - origDate.getFullYear();
+    }
+
+    return { ...ev, targetDate, diffDays, age };
+  }).sort((a, b) => a.diffDays - b.diffDays);
+
+  // 目前開啟「地標詳情」視窗所對應的事件（含算好的 targetDate/diffDays/age），
+  // 從 processedEvents 現查而不是另外存一份快照，這樣視窗開著時倒數天數等資訊會隨 now 自然更新
+  const viewingEvent = viewingId ? processedEvents.find(e => e.id === viewingId) || null : null;
+  // 待刪除確認的那一筆地標（用來在確認彈窗裡顯示標題），刪除後 events 就沒有這筆了，
+  // 這裡從 processedEvents 找不到時視為已不存在，順手把確認彈窗收起來即可
+  const confirmDeleteEvent = confirmDeleteId ? processedEvents.find(e => e.id === confirmDeleteId) || null : null;
+
+  // 已經過去（diffDays < 0）的地標一律歸進上方可收合的區塊，預設收合，
+  // 這樣不論未來地標有幾筆（即使只有一筆），開啟頁面時第一眼看到的永遠是它，不必再手動下滑
+  const pastEvents = processedEvents.filter(ev => ev.diffDays < 0);
+  const upcomingEvents = processedEvents.filter(ev => ev.diffDays >= 0);
+
+  // 搜尋：輸入關鍵字時，直接在全部地標（不分過去／未來）中比對標題，跳出原本的分區顯示
+  const searchQueryNormalized = searchQuery.trim().toLowerCase();
+  const isSearching = searchQueryNormalized.length > 0;
+  const searchResults = isSearching
+    ? processedEvents.filter(ev => ev.title.toLowerCase().includes(searchQueryNormalized))
+    : null;
+
+  function renderEventCard(ev) {
+    return (
+      <div key={ev.id} className="relative pl-6" style={{ zIndex: 10 }}>
+        {/* 圓點指示器：整個事件項目建立獨立堆疊層，圓點永遠位於時間軸線與卡片之上。 */}
+        <div
+          className="absolute w-4 h-4 rounded-full"
+          style={{
+            background: colorHex(ev.colorId),
+            left: -25,
+            top: 4,
+            border: '3px solid var(--page-bg)',
+            boxShadow: '0 0 0 1px var(--card-border), 0 0 0 2px var(--page-bg)',
+            zIndex: 20,
+            pointerEvents: 'none',
+          }}
+        />
+
+        <div
+          className="p-4 rounded-2xl relative group cursor-pointer"
+          style={{
+            ...glass(ev.id === editingId ? { border: `1.5px solid ${ACCENT}` } : {}),
+            position: 'relative',
+            zIndex: 1,
+          }}
+          onClick={() => setViewingId(ev.id)}
+        >
+          <div className="flex justify-between items-start mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">{ev.icon}</span>
+              <h3 className="font-bold text-lg" style={{ color: INK }}>{ev.title}</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={e => { e.stopPropagation(); startEdit(ev); }} aria-label={t.edit} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <Pencil size={15} />
+              </button>
+              <button onClick={e => { e.stopPropagation(); openDeleteConfirm(ev.id); }} aria-label={t.delete} className="p-2 rounded-lg transition-colors" style={{ color: DANGER }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,0,74,0.14)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="text-sm font-medium mb-1 flex items-center gap-2 flex-wrap" style={{ color: INK_SOFT }}>
+            <span>{ev.targetDate.toLocaleDateString(LOCALE_MAP[lang])}</span>
+            {ev.repeat && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'var(--card-border)', color: INK_SOFT }}>
+                {ev.repeatUnit === 'month' ? t.monthlyBadge(ev.repeatInterval) : t.yearlyBadge(ev.repeatInterval)}
+              </span>
+            )}
+          </div>
+          {ev.calendar && ev.calendar !== 'gregory' && (
+            <div className="text-xs font-medium mb-2" style={{ color: ACCENT }}>
+              {formatAltCalendar(ev.targetDate, ev.calendar, lang, t)}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-block px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
+              {ev.diffDays === 0 ? t.today : ev.diffDays > 0 ? t.daysLeft(ev.diffDays) : t.daysAgo(Math.abs(ev.diffDays))}
+            </div>
+            {ev.age !== null && (
+              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
+                {t.ageBadge(ev.age)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div id="timeline-section-root" className="flex-1 min-h-0 flex flex-col">
+      {/* 固定區塊：只有時間軸標題列＋搜尋／新增地標按鈕，永遠固定不動、不隨清單捲動。
+          標題列本身可以往上拖曳，收合上方「世界時鐘」的次要時區清單，騰出畫面給時間軸；
+          最高只能拖到「目前位置」卡片（若有）或「世界時鐘」標題列底下，不會蓋住它們 */}
+      <div className="flex-shrink-0">
+      <div
+        className="flex items-center justify-between mb-3 select-none"
+        style={{ cursor: 'ns-resize', touchAction: 'none' }}
+        onPointerDown={e => {
+          if (e.target.closest('button')) return; // 標題列右側的按鈕不應觸發拖曳
+          e.currentTarget.setPointerCapture(e.pointerId);
+          onHeaderDragStart && onHeaderDragStart(e.clientY);
+        }}
+        onPointerMove={e => { if (e.buttons === 1) onHeaderDragMove && onHeaderDragMove(e.clientY); }}
+        onPointerUp={() => onHeaderDragEnd && onHeaderDragEnd()}
+        onPointerCancel={() => onHeaderDragEnd && onHeaderDragEnd()}
+      >
+        <div className="flex items-center gap-2">
+          <MapPin size={18} style={{ color: MINT }} />
+          <h2 className="font-bold" style={{ color: INK, fontSize: 18 }}>{t.timeline}</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSearchOpen(v => { const next = !v; if (!next) setSearchQuery(''); return next; })}
+            className="flex items-center justify-center rounded-full flex-shrink-0"
+            style={{ ...glass(), width: 30, height: 30, color: searchOpen ? MINT : INK }}
+          >
+            <Search size={14} />
+          </button>
+          <button 
+            onClick={toggleForm}
+            className="flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg font-medium" 
+            style={{ background: showForm ? INK_SOFT : MINT, color: '#fff' }}
+          >
+            {showForm ? <X size={14} /> : <Plus size={14} />}
+            {showForm ? t.cancel : t.newLandmark}
+          </button>
+        </div>
+      </div>
+      {searchOpen && (
+        <div className="relative mb-3">
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: INK_SOFT, pointerEvents: 'none' }} />
+          <input
+            type="text"
+            autoFocus
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
+            style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+          />
+        </div>
+      )}
+      </div>
+
+      {/* 時間軸列表：獨立的捲動容器，不再需要自動捲動 —— 過去的地標已收進上方可收合區塊，
+          預設收合，所以第一眼看到的永遠是最近的未來地標 */}
+      <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto pb-6">
+        {isSearching ? (
+          searchResults.length === 0 ? (
+            <div className="py-8 pl-4">
+              <p style={{ color: INK, fontWeight: 'bold' }}>{t.noSearchResults}</p>
+            </div>
+          ) : (
+            <div className="relative pl-4 border-l-2 ml-2 flex flex-col" style={{ borderColor: '#000', zIndex: 0, gap: EVENT_CARD_GAP }}>
+              {searchResults.map(renderEventCard)}
+            </div>
+          )
+        ) : processedEvents.length === 0 ? (
+          <div className="py-8 pl-4">
+            <p style={{ color: INK, fontWeight: 'bold' }}>{t.emptyTimeline}</p>
+            <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
+          </div>
+        ) : (
+          <div className="relative pl-4 ml-2" style={{ zIndex: 0 }}>
+            {/* 單一貫穿到底的軸線：改用一條絕對定位的線條元素，從收合按鈕最上面一路畫到
+                最後一筆未來地標，取代原本「收合按鈕上方沒有畫線」「過去／未來兩個區塊各自用
+                border-l-2 畫一段、中間留白」的做法，避免軸線在按鈕與兩個區塊交界處斷開。 */}
+            <div
+              aria-hidden="true"
+              className="absolute"
+              style={{ left: 0, top: 0, bottom: 0, width: 2, background: '#000', pointerEvents: 'none' }}
+            />
+            {/* 已經過去的地標：獨立收合區塊，預設收合，永遠排在最上面，不佔用未來地標的版面 */}
+            {pastEvents.length > 0 && (
+              <button
+                onClick={() => setShowPast(v => !v)}
+                className="w-full flex items-center gap-2 px-2 py-2 mb-2 rounded-lg text-sm font-medium"
+                style={{
+                  color: INK_SOFT,
+                  transition: 'color 120ms ease',
+                }}
+              >
+                <ChevronDown
+                  size={14}
+                  style={{
+                    // 收合時箭頭朝左；展開時逆時針旋轉 90°，箭頭朝下。
+                    transform: showPast ? 'rotate(0deg)' : 'rotate(90deg)',
+                    transition: 'transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+                    willChange: 'transform',
+                    flexShrink: 0,
+                  }}
+                />
+                {t.pastLandmarks(pastEvents.length)}
+              </button>
+            )}
+            {pastEvents.length > 0 && (
+              <PastEventsAnimatedSection
+                show={showPast}
+                events={pastEvents}
+                renderEventCard={renderEventCard}
+              />
+            )}
+            {/* 未來（含今天）的地標：永遠是這個容器打開時第一眼看到的內容 */}
+            {upcomingEvents.length > 0 && (
+              <div className="relative flex flex-col" style={{ gap: EVENT_CARD_GAP }}>
+                {upcomingEvents.map(renderEventCard)}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 新增／編輯地標：改成置中的窗口（毛玻璃質感，沿用帳號登入視窗同一套 AUTH_GLASS 樣式），
+          不論時間軸目前捲到哪裡，開啟表單都直接疊在畫面正中央，不用再手動捲到最上方 */}
+      {showForm && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{
+            zIndex: 200,
+            background: formPhase === 'shown' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            opacity: formPhase === 'hidden' ? 0 : 1,
+            transition: `background ${FORM_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${FORM_MODAL_DURATION}ms ease`,
+          }}
+          onClick={closeForm}
+        >
+          <div
+            className={`w-full ${isLargeScreen ? 'max-w-md' : 'max-w-sm'} max-h-[85vh] overflow-y-auto rounded-2xl p-4`}
+            style={{
+              ...AUTH_GLASS,
+              background: 'rgba(255,255,255,0.4)',
+              opacity: formPhase === 'shown' ? 1 : 0,
+              transform: formPhase === 'shown'
+                ? 'translateY(0) scale(1)'
+                : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${FORM_MODAL_DURATION}ms ease, transform ${FORM_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ height: formHeight != null ? formHeight : 'auto', overflow: 'hidden', transition: 'height 170ms cubic-bezier(0.22, 1, 0.36, 1)' }}>
+            <div ref={formContentRef} className="flex flex-col gap-3">
+              <div className="flex items-center justify-between -mb-1">
+                <div className="flex items-center gap-2">
+                  {editingId ? <Pencil size={14} style={{ color: ACCENT }} /> : <Plus size={14} style={{ color: MINT }} />}
+                  <span className="text-sm font-bold" style={{ color: INK }}>{editingId ? t.editLandmark : t.newLandmark}</span>
+                </div>
+                <button onClick={toggleForm} style={{ color: INK_SOFT }}><X size={18} /></button>
+              </div>
+              <input 
+              type="text" placeholder={t.titlePlaceholder} value={title} onChange={e => setTitle(e.target.value)}
+              className="px-3 py-2 rounded-lg text-sm w-full outline-none" style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+            />
+            {/* 曆法：先選擇要用哪一種曆法來輸入日期 */}
+            <select
+              value={calendar}
+              onChange={e => {
+                const val = e.target.value;
+                setCalendar(val);
+                if (val !== 'gregory') setRepeatUnit('year');
+              }}
+              className="px-3 py-2 rounded-lg text-sm w-full outline-none"
+              style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+            >
+              {CAL_OPTIONS.map(c => (
+                <option key={c.id} value={c.id}>{c.label[lang]}</option>
+              ))}
+            </select>
+
+            {/* 日期：依上面選的曆法顯示對應的日期輸入方式 */}
+            {calendar === 'gregory' ? (
+              <div className="relative">
+                <input
+                  type="date" value={date} onChange={e => setDate(e.target.value)}
+                  className="px-3 py-2 rounded-lg text-sm w-full outline-none" style={{ border: CARD_BORDER, background: INPUT_BG, color: date ? INK : 'transparent' }}
+                />
+                {!date && (
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: INK_SOFT }}>
+                    {t.datePlaceholder}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <CalendarDatePicker
+                calendarId={calendar}
+                isoDate={date}
+                onChange={setDate}
+                syncKey={formSession}
+                lang={lang}
+                t={t}
+              />
+            )}
+
+            <div className="flex flex-col gap-2">
+              <div key={isCare ? 'care-icons' : 'normal-icons'} className="flex gap-2 flex-wrap items-center picker-fade-swap">
+                {isCare ? (
+                  <>
+                    {CARE_ICONS.map(i => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setIcon(i)}
+                        className="rounded-lg text-xl flex items-center justify-center relative"
+                        style={{ ...iconPickStyle(icon === i), width: 36, height: 36 }}
+                      >
+                        {i}
+                      </button>
+                    ))}
+                    {/* 「自選」：關懷模式的第三格，只有一格，點了直接改這一格的內容，不會像平常的自訂圖示一路往下加 */}
+                    {careCustomIcon ? (
+                      <div className="relative">
+                        <button
+                          onClick={() => setIcon(careCustomIcon)}
+                          className="p-2 rounded-lg text-xl"
+                          style={iconPickStyle(icon === careCustomIcon)}
+                        >
+                          {careCustomIcon}
+                        </button>
+                        <button
+                          onClick={() => { setShowCustomIconPanel(v => !v); setCustomIconError(''); }}
+                          aria-label={t.customIconLabel}
+                          className="absolute -top-1.5 -right-1.5 rounded-full flex items-center justify-center"
+                          style={{ width: 16, height: 16, background: INK_SOFT, color: '#fff' }}
+                        >
+                          <Pencil size={9} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setShowCustomIconPanel(v => !v); setCustomIconError(''); }}
+                        aria-label={t.customIconLabel}
+                        className="p-2 rounded-lg text-xl flex items-center justify-center"
+                        style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: 36, height: 36 }}
+                      >
+                        <Plus size={16} style={{ color: INK_SOFT }} />
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  ICONS.map(i => {
+                  const hasSubmenu = !!ICON_SUBMENUS[i];
+                  // 選取狀態：目前圖示就是母菜單本身，或屬於它旗下的子菜單選項
+                  const isSelected = icon === i || (hasSubmenu && ICON_SUBMENUS[i].includes(icon));
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        if (hasSubmenu) {
+                          setOpenIconSubmenu(prev => {
+                            const willOpen = prev !== i;
+                            // 展開子菜單的同時，先預設事件圖示為母菜單本身；
+                            // 若之後不在子菜單中選擇，圖示就維持母菜單的內容
+                            if (willOpen) setIcon(i);
+                            return willOpen ? i : null;
+                          });
+                        } else {
+                          setIcon(i);
+                          setOpenIconSubmenu(null);
+                        }
+                      }}
+                      className="p-2 rounded-lg text-xl"
+                      style={iconPickStyle(isSelected)}
+                    >
+                      {i}
+                    </button>
+                  );
+                  })
+                )}
+
+                {/* 自訂圖示：與上方的內建 emoji 放在同一區域，使用者自己輸入想用的 emoji，存起來之後可重複選用（僅一般模式；關懷模式改用上面單獨一格的「自選」） */}
+                {!isCare && customIcons.map(v => (
+                  <div key={v} className="relative">
+                    <button
+                      onClick={() => { setIcon(v); setOpenIconSubmenu(null); }}
+                      className="p-2 rounded-lg text-xl"
+                      style={iconPickStyle(icon === v)}
+                    >
+                      {v}
+                    </button>
+                    <button
+                      onClick={() => handleRemoveCustomIcon(v)}
+                      aria-label={t.delete}
+                      className="absolute -top-1.5 -right-1.5 rounded-full flex items-center justify-center"
+                      style={{ width: 16, height: 16, background: DANGER, color: '#fff' }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+                {!isCare && (
+                  <button
+                    onClick={() => { setShowCustomIconPanel(v => !v); setCustomIconError(''); }}
+                    aria-label={t.customIconLabel}
+                    className="p-2 rounded-lg text-xl flex items-center justify-center"
+                    style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: 36, height: 36 }}
+                  >
+                    <Plus size={16} style={{ color: INK_SOFT }} />
+                  </button>
+                )}
+              </div>
+              {!isCare && openIconSubmenu && ICON_SUBMENUS[openIconSubmenu] && (
+                <div className="flex gap-2 flex-wrap p-2 rounded-lg" style={{ background: INPUT_BG, border: CARD_BORDER }}>
+                  {ICON_SUBMENUS[openIconSubmenu].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => {
+                        setIcon(v);
+                      }}
+                      className="p-2 rounded-lg text-xl"
+                      style={iconPickStyle(icon === v)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showCustomIconPanel && (
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={customIconInput}
+                    onChange={e => { setCustomIconInput(e.target.value); setCustomIconError(''); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); isCare ? handleSetCareCustomIcon() : handleAddCustomIcon(); } }}
+                    placeholder={t.customIconPlaceholder}
+                    maxLength={20}
+                    className="px-3 py-2 rounded-lg text-lg flex-1 outline-none"
+                    style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+                  />
+                  <button
+                    onClick={isCare ? handleSetCareCustomIcon : handleAddCustomIcon}
+                    className="px-3 py-2 rounded-lg text-sm font-bold text-white flex-shrink-0"
+                    style={{ background: MINT }}
+                  >
+                    {t.customIconAdd}
+                  </button>
+                </div>
+              )}
+              {customIconError && (
+                <p className="text-xs font-medium mt-1" style={{ color: DANGER }}>{customIconError}</p>
+              )}
+            </div>
+            <div key={isCare ? 'care-colors' : 'normal-colors'} className="flex gap-2 mb-2 flex-wrap picker-fade-swap">
+              {(isCare ? CARE_COLOR_TAGS : COLOR_TAGS).map(c => (
+                <button key={c.id} onClick={() => setColorId(c.id)} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: c.hex }}>
+                  {colorId === c.id && <Check size={14} color="#fff" />}
+                </button>
+              ))}
+            </div>
+
+            {/* 重複週期 - 獨立欄目 */}
+            <div className="p-3 rounded-xl" style={{ border: CARD_BORDER, background: INPUT_BG }}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold" style={{ color: INK }}>{t.repeatLabel}</span>
+                <button
+                  type="button"
+                  onClick={toggleRepeat}
+                  className="relative flex-shrink-0"
+                  style={{ width: 38, height: 22, borderRadius: 999, background: repeat ? MINT : '#DADDE3', transition: 'background 0.15s' }}
+                >
+                  <span
+                    className="absolute rounded-full bg-white"
+                    style={{ width: 18, height: 18, top: 2, left: repeat ? 18 : 2, transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+                  />
+                </button>
+              </div>
+              {repeat && (
+                <div className="mt-3 picker-fade-swap">
+                  <div className="flex items-center gap-2 text-sm" style={{ color: INK }}>
+                    <span>{t.every}</span>
+                    <input
+                      type="number" min="1" value={repeatInterval}
+                      onChange={e => setRepeatInterval(e.target.value)}
+                      className="w-16 px-2 py-1.5 rounded-lg text-sm text-center outline-none"
+                      style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+                    />
+                    {calendar === 'gregory' ? (
+                      <select
+                        value={repeatUnit}
+                        onChange={e => setRepeatUnit(e.target.value)}
+                        className="flex-1 px-2 py-1.5 rounded-lg text-sm outline-none"
+                        style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+                      >
+                        <option value="year">{t.unitYear}</option>
+                        <option value="month">{t.unitMonth}</option>
+                      </select>
+                    ) : (
+                      <span className="flex-1 px-2 py-1.5 rounded-lg text-sm" style={{ border: CARD_BORDER, color: INK_SOFT }}>{t.unitYear}</span>
+                    )}
+                  </div>
+                  <p className="text-xs mt-2" style={{ color: INK_SOFT }}>
+                    {calendar !== 'gregory' ? t.lunarRepeatFixedHint : t.repeatHint}
+                  </p>
+
+                  {(calendar !== 'gregory' || repeatUnit === 'year') && (
+                    <div className="mt-3 pt-3 picker-fade-swap" style={{ borderTop: CARD_BORDER }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold" style={{ color: INK }}>{t.birthdayLabel}</span>
+                        <button
+                          type="button"
+                          onClick={toggleBirthday}
+                          className="relative flex-shrink-0"
+                          style={{ width: 38, height: 22, borderRadius: 999, background: isBirthday ? ACCENT : '#DADDE3', transition: 'background 0.15s' }}
+                        >
+                          <span
+                            className="absolute rounded-full bg-white"
+                            style={{ width: 18, height: 18, top: 2, left: isBirthday ? 18 : 2, transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+                          />
+                        </button>
+                      </div>
+                      {isBirthday && <p className="text-xs mt-2" style={{ color: INK_SOFT }}>{t.birthdayHint}</p>}
+                    </div>
+                  )}
+
+                  {/* 關懷模式：和生日模式一樣，收在「重複」開啟之後才會出現 */}
+                  <div className="mt-3 pt-3" style={{ borderTop: CARD_BORDER }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold" style={{ color: INK }}>{t.careLabel}</span>
+                      <button
+                        type="button"
+                        onClick={toggleCare}
+                        className="relative flex-shrink-0"
+                        style={{ width: 38, height: 22, borderRadius: 999, background: isCare ? '#5B5B63' : '#DADDE3', transition: 'background 0.15s' }}
+                      >
+                        <span
+                          className="absolute rounded-full bg-white"
+                          style={{ width: 18, height: 18, top: 2, left: isCare ? 18 : 2, transition: 'left 0.15s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+                        />
+                      </button>
+                    </div>
+                    {isCare && <p className="text-xs mt-2" style={{ color: INK_SOFT }}>{t.careHint}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleAdd}
+              className="w-full py-2.5 rounded-full font-bold text-sm"
+              style={{
+                background: 'rgba(255,255,255,0.6)',
+                backdropFilter: 'blur(24px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                border: '1px solid rgba(60,64,67,0.25)',
+                color: INK,
+                boxShadow: '0 4px 16px rgba(31,38,135,0.12)',
+              }}
+            >
+              {editingId ? t.saveChanges : t.addToTimeline}
+            </button>
+            </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 「地標詳情」視窗：點一下時間軸卡片開啟，跟新增／編輯地標視窗一樣掛在 document.body 底下。
+          不分手機或大屏，一律用同一種「置中彈窗＋點外部關閉」樣式，卡片大小本來就是用 max-w-sm／
+          max-h-[85vh] 這種相對單位撐出來的，會自動適應螢幕大小，不需要為大屏另外做一份固定版面 */}
+      {viewingEvent && createPortal(
+        <LandmarkDetailModal
+          ev={viewingEvent} lang={lang} t={t} isDark={isDark}
+          onClose={() => setViewingId(null)}
+          onSetBgImage={dataUrlOrNull => setEventBgImage(viewingEvent.id, dataUrlOrNull)}
+          onSetBgOpacity={opacity => setEventBgOpacity(viewingEvent.id, opacity)}
+          onSetNumberFont={fontId => setEventNumberFont(viewingEvent.id, fontId)}
+        />,
+        document.body
+      )}
+
+      {/* 刪除地標前的二次確認：跟帳號那邊「刪除帳號」用的是同一套風格
+          （置中彈窗、AUTH_GLASS 毛玻璃卡片、標題用 DANGER 紅色），
+          下面兩個按鈕並排：左邊「確認刪除」白底紅邊紅字、右邊「取消操作」紅底白字，
+          不分手機或大屏都用同一種置中彈窗，不用像地標詳情那樣嵌進右側面板——這只是個短暫的二次確認，
+          不需要那麼重的處理 */}
+      {confirmDeleteEvent && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{
+            zIndex: 205,
+            background: deleteModalPhase === 'shown' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            opacity: deleteModalPhase === 'hidden' ? 0 : 1,
+            transition: `background ${DELETE_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${DELETE_MODAL_DURATION}ms ease`,
+          }}
+          onClick={closeDeleteConfirm}
+        >
+          <div
+            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
+            style={{
+              ...AUTH_GLASS,
+              opacity: deleteModalPhase === 'shown' ? 1 : 0,
+              transform: deleteModalPhase === 'shown'
+                ? 'translateY(0) scale(1)'
+                : 'translateY(10px) scale(0.97)',
+              transition: `opacity ${DELETE_MODAL_DURATION}ms ease, transform ${DELETE_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteLandmarkConfirmTitle}</h2>
+              <button onClick={closeDeleteConfirm} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+            </div>
+            <p className="text-sm" style={{ color: INK }}>{t.deleteLandmarkConfirmDesc(confirmDeleteEvent.title)}</p>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => { deleteEvent(confirmDeleteEvent.id); closeDeleteConfirm(); }}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}
+              >
+                {t.confirmDeleteLandmark}
+              </button>
+              <button
+                onClick={closeDeleteConfirm}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: DANGER, color: '#fff' }}
+              >
+                {t.cancelDeleteLandmark}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Watermark ---------------- */
+function Watermark() {
+  return (
+    <div
+      className="fixed bottom-2.5 right-3 select-none"
+      style={{ zIndex: 9999, fontSize: 11, fontWeight: 600, letterSpacing: 0.2, color: 'rgba(120,124,138,0.4)', pointerEvents: 'none' }}
+    >
+      @zhaoziwuofficial
+    </div>
+  );
+}
+
+// 產生「本機系統時區的標準時間」字串（精確到秒），用於測試版水印顯示訪問／渲染當下的時間，
+// 方便測試人員回報問題時，快速對照「當時看到的是哪個時間點的畫面」。
+function formatWatermarkAccessTime(date) {
+  const pad = n => String(n).padStart(2, '0');
+  const y = date.getFullYear(), mo = pad(date.getMonth() + 1), d = pad(date.getDate());
+  const h = pad(date.getHours()), mi = pad(date.getMinutes()), s = pad(date.getSeconds());
+  let zoneSuffix = '';
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const offsetMin = -date.getTimezoneOffset(); // 分鐘數，正值代表比 UTC 快
+    const sign = offsetMin >= 0 ? '+' : '-';
+    const oh = pad(Math.floor(Math.abs(offsetMin) / 60));
+    const om = pad(Math.abs(offsetMin) % 60);
+    zoneSuffix = ` ${tz} UTC${sign}${oh}:${om}`;
+  } catch (e) {}
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}${zoneSuffix}`;
+}
+/* ---------------- 臨時測試版浮水印（醒目、鋪滿全頁，可隨時移除） ----------------
+   移除方式：刪除本元件、上方的 SHOW_TEST_WATERMARK / TEST_WATERMARK_TEXT 常數，
+   以及 App() return 裡的 {SHOW_TEST_WATERMARK && <TestVersionWatermark />} 這一行即可，
+   不會動到其他任何功能。 */
+function TestVersionWatermark() {
+  // 只在元件第一次掛載（也就是這次訪問／渲染）時取一次時間，之後不再更新，
+  // 代表「使用者這次打開／整頁重新渲染時，系統時區當下的標準時間」。
+  const [accessTime] = useState(() => formatWatermarkAccessTime(new Date()));
+  const watermarkText = `${TEST_WATERMARK_TEXT} ${accessTime}`;
+  const rows = 10;
+  const cols = 4;
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      cells.push(
+        <span
+          key={`${r}-${c}`}
+          className="select-none whitespace-nowrap"
+          style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.3, color: 'rgba(45,45,48,0.06)' }}
+        >
+          {watermarkText}
+        </span>
+      );
+    }
+  }
+  return (
+    // zIndex 為負值：讓浮水印疊在正常文件流內容「之下」（置底），不會蓋住卡片、按鈕等 UI
+    <div className="fixed inset-0 overflow-hidden" style={{ zIndex: -1, pointerEvents: 'none' }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: '-30%',
+          left: '-30%',
+          width: '160%',
+          height: '160%',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridAutoRows: '110px',
+          placeItems: 'center',
+          transform: 'rotate(-28deg)',
+        }}
+      >
+        {cells}
+      </div>
+    </div>
+  );
+}
+
+const AUTH_GLASS = {
+  background: 'rgba(255,255,255,0.55)',
+  backdropFilter: 'blur(24px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+  border: '1px solid rgba(255,255,255,0.4)',
+  boxShadow: '0 8px 32px rgba(31,38,135,0.18)',
+};
+
+function GoogleGIcon({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+      <path fill="#4285F4" d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8427 2.0782-1.7959 2.7164v2.2581h2.9087c1.7018-1.5668 2.6836-3.8741 2.6836-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.4673-.8064 5.9564-2.1818l-2.9087-2.2581c-.8064.54-1.8368.8591-3.0477.8591-2.3446 0-4.3282-1.5831-5.0359-3.7104H.9573v2.3318C2.4382 15.9832 5.4818 18 9 18z" />
+      <path fill="#FBBC05" d="M3.9641 10.71c-.18-.54-.2823-1.1168-.2823-1.71s.1023-1.17.2823-1.71V4.9582H.9573A8.9965 8.9965 0 000 9c0 1.4527.3477 2.8268.9573 4.0418L3.9641 10.71z" />
+      <path fill="#EA4335" d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.4259 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.9641 7.29C4.6718 5.1627 6.6555 3.5795 9 3.5795z" />
+    </svg>
+  );
+}
+
+/* 密碼輸入框：內建「顯示／隱藏已輸入內容」切換按鈕，供登入／註冊／修改密碼等表單共用 */
+function PasswordField({ inputRef, value, onChange, onKeyDown, placeholder, t, className, style }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        type={visible ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        className={className}
+        style={{ ...style, paddingRight: 38 }}
+      />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible(v => !v)}
+        aria-label={visible ? t.hidePassword : t.showPassword}
+        className="absolute right-0 top-0 h-full flex items-center px-2.5"
+        style={{ color: INK_SOFT }}
+      >
+        {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  );
+}
+
+/* ---------------- 帳號登入 Modal ---------------- */
+function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
+  // 大屏（折叠屏展开／平板／桌面）下把視窗card稍微加寬一些，比例更接近桌面軟體的置中對話框，
+  // 不像手機那樣窄窄一條；由於這裡的視窗本來就已經是「置中顯示」（fixed inset-0 + items-center），
+  // 所以只需要放寬 max-width，不需要改變彈出方式或位置。
+  const isLargeScreen = useIsLargeScreen();
+  const [modalPhase, setModalPhase] = useState('enter');
+  const AUTH_MODAL_DURATION = 150;
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setModalPhase('shown'));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  function handleClose() {
+    if (modalPhase === 'closing') return;
+    setModalPhase('closing');
+    setTimeout(onClose, AUTH_MODAL_DURATION);
+  }
+  const modalShown = modalPhase === 'shown';
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [magicSent, setMagicSent] = useState(false);
+  // 是否偵測為中國大陸用戶：只在「尚未登入」的登入／註冊頁面擋下，已登入的帳號管理畫面不受影響
+  const [cnBlocked] = useState(() => isLikelyMainlandChinaUser());
+
+  // ---- 本機備份（匯出／匯入）：雲端同步在中國大陸連不上時的替代方案 ----
+  // 直接把目前的 clocks／events／lang／isDark／customIcons 整包輸出，
+  // 需要的時候再走同一套 applyCloudData 邏輯還原回來。
+  //
+  // Android 上單純觸發 <a download> 存成 .tzzwnb 檔，使用者常常找不到檔案存去哪了（下載資料夾要另外搜尋，
+  // 門檻很高）。改成優先使用 Web Share API（navigator.share 帶 file），直接叫出系統原生的分享面板，
+  // 使用者可以直接選「傳送給自己」「儲存到雲端硬碟」「記事本」等——不需要碰檔案總管。
+  // 不支援 Web Share 的瀏覽器（多半是桌面版）才退回原本的 <a download> 下載方式。
+  const importFileRef = useRef(null);
+  const [backupMsg, setBackupMsg] = useState(null); // { type: 'success' | 'error', text }
+
+  function buildBackupPayload() {
+    return { ...backupData, exportedAt: Date.now() };
+  }
+
+  async function parseAndImport(fileText) {
+    const data = await parseBackupPayload(fileText);
+    if (!data) {
+      setBackupMsg({ type: 'error', text: t.backupImportError });
+      return false;
+    }
+    onImportBackup(data);
+    setBackupMsg({ type: 'success', text: t.backupImportSuccess });
+    return true;
+  }
+
+  async function handleExportBackup() {
+    const json = JSON.stringify(buildBackupPayload(), null, 2);
+    const encryptedText = await encryptBackupText(json);
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const filename = `sgx-backup-${stamp}.tzzwnb`;
+    const file = new File([encryptedText], filename, { type: 'application/octet-stream' });
+
+    // 優先走系統分享面板（手機上最直覺，不用自己去下載資料夾找檔案）
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      } catch (err) {
+        // 使用者取消分享，或裝置不支援帶檔案分享：不當成錯誤，繼續往下退回下載方式
+      }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // 允許連續匯入同一個檔案時也能觸發 change
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => parseAndImport(String(reader.result));
+    reader.onerror = () => setBackupMsg({ type: 'error', text: t.backupImportError });
+    reader.readAsText(file);
+  }
+
+  function BackupSection() {
+    return (
+      <div className="flex flex-col gap-2 pt-3 mt-1" style={{ borderTop: CARD_BORDER }}>
+        <p className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.backupSectionTitle}</p>
+        <p className="text-xs" style={{ color: INK_SOFT }}>{t.backupHint}</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportBackup}
+            className="flex-1 py-2 rounded-xl text-sm font-bold"
+            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+          >
+            {t.backupExportBtn}
+          </button>
+          <button
+            type="button"
+            onClick={() => importFileRef.current && importFileRef.current.click()}
+            className="flex-1 py-2 rounded-xl text-sm font-bold"
+            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+          >
+            {t.backupImportBtn}
+          </button>
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".tzzwnb"
+            className="hidden"
+            onChange={handleImportFileChange}
+          />
+        </div>
+
+        {backupMsg && (
+          <p className="text-xs font-bold" style={{ color: backupMsg.type === 'success' ? MINT : DANGER }}>
+            {backupMsg.text}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // 已登入帳號管理：主畫面／修改密碼／註銷確認
+  const [view, setView] = useState('main');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+
+  // 鍵盤操作：Enter／方向鍵向下 可以切換到下一個欄位，方向鍵向上可以回到上一個欄位，最後一欄按 Enter 直接送出
+  const emailRef = useRef(null);
+  const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
+  const currentPasswordRef = useRef(null);
+  const newPasswordRef = useRef(null);
+  const confirmNewPasswordRef = useRef(null);
+
+  function stepToNext(nextRef, onSubmit, prevRef) {
+    return (e) => {
+      if (e.key === 'Enter' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (nextRef && nextRef.current) nextRef.current.focus();
+        else if (onSubmit) onSubmit();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (prevRef && prevRef.current) prevRef.current.focus();
+      }
+    };
+  }
+
+  async function run(fn) {
+    setBusy(true);
+    setError('');
+    // Firebase 的請求在部分網路環境下可能連不上、卡在內部重試／等待逾時，
+    // 使用者畫面上就是「一直轉圈、不知道發生什麼事」。
+    // 這裡自己加一個 8 秒的逾時，超過就先把畫面還給使用者，顯示這個功能目前無法使用、
+    // 請聯繫開發者，而不是讓 Firebase 自己的（更長的）逾時機制決定使用者要等多久。
+    // 注意：timedOut 要宣告在 try 區塊外面，因為 let／const 是區塊作用域，
+    // 宣告在 try{} 裡面的話，下面 catch{} 區塊是完全存取不到的。
+    let timedOut = false;
+    try {
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => { timedOut = true; reject(new Error('timeout')); }, 8000);
+      });
+      await Promise.race([fn(), timeoutPromise]);
+    } catch (err) {
+      setError(timedOut ? t.authTimeout : t.authError);
+    }
+    setBusy(false);
+  }
+
+  function handleSubmit() {
+    if (mode === 'signup' && password !== confirmPassword) {
+      setError(t.passwordMismatch);
+      return;
+    }
+    run(async () => {
+      if (mode === 'login') await signInWithEmail(email, password);
+      else await signUpWithEmail(email, password);
+    });
+  }
+
+  function handleChangePassword() {
+    if (newPassword !== confirmNewPassword) {
+      setError(t.passwordMismatch);
+      return;
+    }
+    run(async () => {
+      await changePassword(currentPassword, newPassword);
+      setPwSuccess(true);
+      setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword('');
+    });
+  }
+
+  if (user) {
+    const providerId = getCurrentUserProviderId();
+    const methodLabel = providerId === 'google.com' ? t.loginMethodGoogle : providerId === 'apple.com' ? t.loginMethodApple : t.loginMethodEmail;
+
+    if (view === 'changePassword') {
+      return (
+        <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+            zIndex: 200,
+            background: modalShown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            transition: `background ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          }} onClick={handleClose}>
+          <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{
+              ...AUTH_GLASS,
+              opacity: modalShown ? 1 : 0,
+              transform: modalShown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${AUTH_MODAL_DURATION}ms ease, transform ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black" style={{ color: INK }}>{t.changePassword}</h2>
+              <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
+            </div>
+            <PasswordField
+              inputRef={currentPasswordRef} t={t}
+              placeholder={t.currentPassword} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+              onKeyDown={stepToNext(newPasswordRef, null, null)}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+              style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+            />
+            <PasswordField
+              inputRef={newPasswordRef} t={t}
+              placeholder={t.newPassword} value={newPassword} onChange={e => setNewPassword(e.target.value)}
+              onKeyDown={stepToNext(confirmNewPasswordRef, null, currentPasswordRef)}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+              style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+            />
+            <PasswordField
+              inputRef={confirmNewPasswordRef} t={t}
+              placeholder={t.confirmNewPassword} value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)}
+              onKeyDown={stepToNext(null, handleChangePassword, newPasswordRef)}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+              style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+            />
+            {error && <p className="text-xs font-bold" style={{ color: DANGER }}>{error}</p>}
+            {pwSuccess && <p className="text-xs font-bold" style={{ color: MINT }}>{t.passwordChangeSuccess}</p>}
+            <button
+              onClick={handleChangePassword}
+              disabled={busy || !currentPassword || !newPassword || !confirmNewPassword}
+              className="py-2.5 rounded-xl font-bold text-sm"
+              style={{ background: MINT, color: '#fff', opacity: busy || !currentPassword || !newPassword || !confirmNewPassword ? 0.6 : 1 }}
+            >
+              {t.saveChangesBtn}
+            </button>
+            <button
+              onClick={() => { setView('main'); setError(''); setPwSuccess(false); }}
+              className="text-xs font-bold"
+              style={{ color: ACCENT }}
+            >
+              {t.back}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (view === 'deleteConfirm') {
+      return (
+        <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+            zIndex: 200,
+            background: modalShown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            transition: `background ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          }} onClick={handleClose}>
+          <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{
+              ...AUTH_GLASS,
+              opacity: modalShown ? 1 : 0,
+              transform: modalShown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${AUTH_MODAL_DURATION}ms ease, transform ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteAccountConfirmTitle}</h2>
+              <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
+            </div>
+            <p className="text-sm" style={{ color: INK }}>{t.deleteAccountConfirmDesc}</p>
+            {providerId === 'password' && (
+              <PasswordField
+                t={t}
+                placeholder={t.currentPassword} value={deletePassword} onChange={e => setDeletePassword(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); run(async () => { await deleteAccount(deletePassword); handleClose(); }); } }}
+                className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+                style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+              />
+            )}
+            {error && <p className="text-xs font-bold" style={{ color: DANGER }}>{error}</p>}
+            <button
+              onClick={() => run(async () => { await deleteAccount(deletePassword); handleClose(); })}
+              disabled={busy || (providerId === 'password' && !deletePassword)}
+              className="py-2.5 rounded-xl font-bold text-sm"
+              style={{ background: DANGER, color: '#fff', opacity: busy || (providerId === 'password' && !deletePassword) ? 0.6 : 1 }}
+            >
+              {t.confirmDelete}
+            </button>
+            <button
+              onClick={() => { setView('main'); setError(''); }}
+              className="text-xs font-bold"
+              style={{ color: ACCENT }}
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+            zIndex: 200,
+            background: modalShown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            transition: `background ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          }} onClick={handleClose}>
+        <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-4`} style={{
+              ...AUTH_GLASS,
+              opacity: modalShown ? 1 : 0,
+              transform: modalShown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${AUTH_MODAL_DURATION}ms ease, transform ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }} onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black" style={{ color: INK }}>{t.account}</h2>
+            <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
+          </div>
+          <p className="text-sm" style={{ color: INK }}>{t.loggedInAs(user.email || user.displayName || user.uid)}</p>
+          <p className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.loginMethodLabel}：{methodLabel}</p>
+
+          {providerId === 'password' && (
+            <button
+              onClick={() => { setView('changePassword'); setError(''); setPwSuccess(false); }}
+              className="py-2.5 rounded-xl font-bold text-sm"
+              style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+            >
+              {t.changePassword}
+            </button>
+          )}
+
+          <BackupSection />
+
+          <button
+            onClick={() => run(async () => { await signOutUser(); handleClose(); })}
+            disabled={busy}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm"
+            style={{ background: DANGER, color: '#fff', opacity: busy ? 0.6 : 1 }}
+          >
+            <LogOut size={15} /> {t.logout}
+          </button>
+
+          <button
+            onClick={() => { setView('deleteConfirm'); setError(''); setDeletePassword(''); }}
+            className="text-xs font-bold"
+            style={{ color: DANGER }}
+          >
+            {t.deleteAccount}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (cnBlocked) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+            zIndex: 200,
+            background: modalShown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            transition: `background ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          }} onClick={handleClose}>
+        <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{
+              ...AUTH_GLASS,
+              opacity: modalShown ? 1 : 0,
+              transform: modalShown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${AUTH_MODAL_DURATION}ms ease, transform ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }} onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black" style={{ color: INK }}>{t.loginToSync}</h2>
+            <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
+          </div>
+          <p className="text-sm font-bold" style={{ color: DANGER }}>{t.mainlandCnBlocked}</p>
+          <BackupSection />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+            zIndex: 200,
+            background: modalShown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            transition: `background ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          }} onClick={handleClose}>
+      <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{
+              ...AUTH_GLASS,
+              opacity: modalShown ? 1 : 0,
+              transform: modalShown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+              transition: `opacity ${AUTH_MODAL_DURATION}ms ease, transform ${AUTH_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black" style={{ color: INK }}>{t.loginToSync}</h2>
+          <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
+        </div>
+
+        <button
+          onClick={() => run(signInWithGoogle)}
+          disabled={busy}
+          className="flex items-center justify-center gap-2.5 py-2.5 rounded-full font-bold text-sm"
+          style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(60,64,67,0.25)', color: INK, opacity: busy ? 0.6 : 1 }}
+        >
+          <GoogleGIcon /> {t.continueWithGoogle}
+        </button>
+        {SHOW_APPLE_LOGIN && (
+          <button
+            onClick={() => run(signInWithApple)}
+            disabled={busy}
+            className="py-2.5 rounded-xl font-bold text-sm"
+            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK, opacity: busy ? 0.6 : 1 }}
+          >
+            {t.continueWithApple}
+          </button>
+        )}
+
+        <div className="flex items-center gap-2 my-1">
+          <div className="flex-1 h-px" style={{ background: 'var(--card-border)' }} />
+          <span className="text-xs" style={{ color: INK_SOFT }}>{t.orDivider}</span>
+          <div className="flex-1 h-px" style={{ background: 'var(--card-border)' }} />
+        </div>
+
+        <input
+          ref={emailRef}
+          type="email" placeholder={t.email} value={email} onChange={e => setEmail(e.target.value)}
+          onKeyDown={stepToNext(passwordRef, null, null)}
+          className="px-3 py-2.5 rounded-xl text-sm outline-none"
+          style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+        />
+        <PasswordField
+          inputRef={passwordRef} t={t}
+          placeholder={t.password} value={password} onChange={e => setPassword(e.target.value)}
+          onKeyDown={stepToNext(mode === 'signup' ? confirmPasswordRef : null, handleSubmit, emailRef)}
+          className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+          style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+        />
+        {mode === 'signup' && (
+          <PasswordField
+            inputRef={confirmPasswordRef} t={t}
+            placeholder={t.confirmPassword} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+            onKeyDown={stepToNext(null, handleSubmit, passwordRef)}
+            className="px-3 py-2.5 rounded-xl text-sm outline-none w-full"
+            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+          />
+        )}
+        {error && <p className="text-xs font-bold" style={{ color: DANGER }}>{error}</p>}
+
+        <button
+          onClick={handleSubmit}
+          disabled={busy || !email || !password || (mode === 'signup' && !confirmPassword)}
+          className="py-2.5 rounded-xl font-bold text-sm"
+          style={{ background: MINT, color: '#fff', opacity: busy || !email || !password || (mode === 'signup' && !confirmPassword) ? 0.6 : 1 }}
+        >
+          {mode === 'login' ? t.login : t.signup}
+        </button>
+        <button
+          onClick={() => { setMode(m => (m === 'login' ? 'signup' : 'login')); setConfirmPassword(''); setError(''); }}
+          className="text-xs font-bold"
+          style={{ color: ACCENT }}
+        >
+          {mode === 'login' ? t.switchToSignup : t.switchToLogin}
+        </button>
+
+        <div className="flex items-center gap-2 my-1">
+          <div className="flex-1 h-px" style={{ background: 'var(--card-border)' }} />
+          <span className="text-xs" style={{ color: INK_SOFT }}>{t.orDivider}</span>
+          <div className="flex-1 h-px" style={{ background: 'var(--card-border)' }} />
+        </div>
+
+        {magicSent ? (
+          <p className="text-xs font-bold text-center" style={{ color: MINT }}>{t.magicLinkSent}</p>
+        ) : (
+          <button
+            onClick={() => run(async () => { await sendMagicLink(email); setMagicSent(true); })}
+            disabled={busy || !email}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm"
+            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK, opacity: busy || !email ? 0.6 : 1 }}
+          >
+            <Mail size={15} /> {t.sendMagicLink}
+          </button>
+        )}
+
+        <BackupSection />
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 首次登入資料合併 Dialog ---------------- */
+function MergeDialog({ t, onResolve }) {
+  const isLargeScreen = useIsLargeScreen();
+  const [phase, setPhase] = useState('enter');
+  const MERGE_MODAL_DURATION = 150;
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setPhase('shown'));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const shown = phase === 'shown';
+  function handleResolve(result) {
+    if (phase === 'closing') return;
+    setPhase('closing');
+    setTimeout(() => onResolve(result), MERGE_MODAL_DURATION);
+  }
+  return (
+    <div className="fixed inset-0 flex items-center justify-center px-6" style={{
+        zIndex: 210,
+        background: shown ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0)',
+        transition: `background ${MERGE_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+      }}>
+      <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{
+          ...AUTH_GLASS,
+          opacity: shown ? 1 : 0,
+          transform: shown ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.97)',
+          transition: `opacity ${MERGE_MODAL_DURATION}ms ease, transform ${MERGE_MODAL_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        }}>
+        <h2 className="text-lg font-black" style={{ color: INK }}>{t.mergeTitle}</h2>
+        <p className="text-sm" style={{ color: INK_SOFT }}>{t.mergeDesc}</p>
+        <button onClick={() => handleResolve('merge')} className="py-2.5 rounded-xl font-bold text-sm" style={{ background: MINT, color: '#fff' }}>
+          {t.mergeOptionMerge}
+        </button>
+        <button onClick={() => handleResolve('cloud')} className="py-2.5 rounded-xl font-bold text-sm" style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}>
+          {t.mergeOptionUseCloud}
+        </button>
+        <button onClick={() => handleResolve('local')} className="py-2.5 rounded-xl font-bold text-sm" style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}>
+          {t.mergeOptionUseLocal}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function InviteGate({ lang, t, onUnlocked }) {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [checking, setChecking] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (checking) return;
+    setChecking(true);
+    setError('');
+    try {
+      const result = await verifyInviteCode(code);
+      if (result.ok) {
+        await window.storage.set(INVITE_KEY, 'true', false).catch(() => {});
+        onUnlocked();
+      } else {
+        setError(t.inviteInvalid);
+      }
+    } catch (err) {
+      setError(t.inviteInvalid);
+    }
+    setChecking(false);
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--page-bg)', fontFamily: "'Inter', sans-serif" }}>
+      <form onSubmit={handleSubmit} className="w-full max-w-xs p-6 rounded-2xl flex flex-col gap-3" style={{ background: 'var(--card-bg)', border: CARD_BORDER }}>
+        <h1 className="text-lg font-black" style={{ color: INK }}>{t.inviteTitle}</h1>
+        <p className="text-sm" style={{ color: INK_SOFT }}>{t.inviteSubtitle}</p>
+        <input
+          type="text"
+          autoFocus
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          placeholder={t.invitePlaceholder}
+          className="px-3 py-2 rounded-lg text-sm w-full outline-none"
+          style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+        />
+        {error && <p className="text-xs font-medium" style={{ color: DANGER }}>{error}</p>}
+        <button
+          type="submit"
+          disabled={checking || !code.trim()}
+          className="px-3 py-2 rounded-lg text-sm font-bold text-white"
+          style={{ background: MINT, opacity: checking || !code.trim() ? 0.6 : 1 }}
+        >
+          {checking ? t.inviteChecking : t.inviteSubmit}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+const EVENTS_KEY = 'countdown-timeline-events';
+const CLOCKS_KEY = 'world-clock-list';
+const LANG_KEY = 'app-language';
+const DARK_KEY = 'app-dark-mode';
+const CUSTOM_ICONS_KEY = 'custom-icon-emojis';
+const HOME_TZ_ID_KEY = 'world-clock-home-id'; // 世界時鐘「目前位置」設定的是哪一筆時鐘（存 id），修好重新整理後會回復原狀的問題
+const NOTIFY_ENABLED_KEY = 'event-notify-enabled';
+const NOTIFY_DAYS_BEFORE_KEY = 'event-notify-days-before';
+// 記錄每個事件「上一次已經通知過的是哪一次occurrence」（存目標日期字串，不是存剩餘天數！）
+// 這樣重複性事件（例如生日）明年倒數又走到同一個天數時，才不會因為存的是同一個數字而被誤判成
+// 「已經通知過」，導致往後每年都收不到提醒
+const NOTIFY_LOG_KEY = 'event-notify-log';
+
+/* ---------------- Main App Component ---------------- */
+export default function App() {
+  const [lang, setLang] = useState('zh-TW');
+  const [clocks, setClocks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [isDark, setIsDark] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [unlocked, setUnlocked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [customIcons, setCustomIcons] = useState([]);
+  const [homeTz, setHomeTz] = useState(null); // 世界時鐘中設定的「目前位置」時區，用來決定頂部問候語
+  // 世界時鐘「目前位置」設定的是清單裡哪一筆（存 id）。原本這個狀態只存在 WorldClockSection
+  // 元件自己的 local state 裡，元件一重新掛載（例如整頁重新整理）就會回到初始值 null，
+  // 使用者原本設定好的「目前位置」就憑空消失。現在提升到 App 這一層，跟 events／clocks
+  // 用同一套 window.storage 讀取／自動儲存機制，重新整理後才能維持原本設定。
+  const [homeTzId, setHomeTzId] = useState(null);
+
+  // App 一啟動就先載入「系統圓體」（Inter），因為它是全 App 數字的預設字體，
+  // 不能等使用者打開某張卡片的自定義面板才動態載入，否則字體檔案還沒到位、
+  // 瀏覽器會先 fallback 成系統字體，看起來像沒套用成功。
+  useEffect(() => {
+    const defaultFont = NUMBER_FONTS.find(f => f.id === 'inter');
+    if (defaultFont) ensureGoogleFontLoaded(defaultFont.googleFont);
+  }, []);
+
+  // ---- 事件倒數日通知提醒 ----
+  // notifyEnabled／notifyDaysBefore 是全域統一設定（所有事件共用同一個「提前幾天提醒」的天數）；
+  // notifyLog 記錄每個事件「上一次已經通知過的是哪一次occurrence」（用目標日期字串當 key，
+  // 不是存剩餘天數），這樣重複性事件（生日之類）明年再走到同一個天數時才不會被誤判成已經通知過。
+  // notifyPermission 反映瀏覽器的 Notification 權限狀態；'unsupported' 表示這個瀏覽器根本沒有
+  // Notification API（例如某些行動瀏覽器）。
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [notifyDaysBefore, setNotifyDaysBefore] = useState(3);
+  const [notifyLog, setNotifyLog] = useState({});
+  const [notifyPermission, setNotifyPermission] = useState(
+    typeof window !== 'undefined' && typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
+
+  // ---- 折叠屏展开／平板／桌面等大屏的分欄版面 ----
+  // isLargeScreen 決定要不要切成「世界時鐘固定左側、時間軸在右側獨立捲動」的分欄版面。
+  // 版面本身固定不變，不會因為開啟詳情視窗而重排——詳情視窗（時鐘／地標）一律用置中彈窗顯示，
+  // 跟手機版共用同一套元件與樣式（見 WorldClockSection／TimelineSection 內部各自的 createPortal）。
+  const isLargeScreen = useIsLargeScreen();
+  const [clockModalOpen, setClockModalOpen] = useState(false);
+  const [viewingId, setViewingId] = useState(null);
+
+  // 「目前位置時鐘詳情」跟「地標詳情」邏輯上互斥——同一時間只會有一張卡片是「使用者現在想看的」。
+  // 這裡包一層：開時鐘詳情時順手把地標詳情關掉，反過來開地標詳情時也順手把時鐘詳情關掉，
+  // 避免兩個彈窗同時疊在畫面上。
+  function openClockModalSafe(open) {
+    if (open) setViewingId(null);
+    setClockModalOpen(open);
+  }
+  function setViewingIdSafe(id) {
+    if (id) setClockModalOpen(false);
+    setViewingId(id);
+  }
+
+  // File Handling API：使用者在作業系統裡直接用「開啟檔案」／雙擊 .tzzwnb 備份檔、
+  // 或對著已安裝的 App 圖示把 .tzzwnb 檔拖進去時，瀏覽器會啟動這個 PWA 並把檔案透過
+  // window.launchQueue 傳進來（不會經過任何 <input type="file">）。這裡用一個小提示條
+  // 顯示匯入結果，因為這種啟動方式當下不一定會打開帳號管理 Modal，使用者需要看得到回饋。
+  const [fileHandlerMsg, setFileHandlerMsg] = useState(null); // { type: 'success' | 'error', text }
+  const [nowTick, setNowTick] = useState(new Date());
+  useEffect(() => { const iv = setInterval(() => setNowTick(new Date()), 30000); return () => clearInterval(iv); }, []);
+
+  // ---- 「世界時鐘」次要時區清單（Part2）：改成「有高度上限、可自行捲動」的區塊 ----
+  // 原本這裡的高度沒有上限（只有手動拖曳時間軸標題列才會收合），
+  // 時區加太多就會把下面的時間軸整個推出畫面。現在固定給一個上限（依畫面高度換算），
+  // 超過上限的時區改成在這個範圍內自行上下捲動查看，時間軸的位置不再受時區數量影響。
+  //
+  // 「目前位置」（Part 1）維持獨立於這個區塊之外、永遠置頂常駐顯示，不受下面任何捲動／收合影響。
+  //
+  // 收合／展開只能透過手動拖曳「時間軸」標題列觸發；原本「清單捲到底/頂會連動收合展開」的功能
+  // 依需求已移除，避免使用者在清單裡正常上下捲動時不小心誤觸收合。
+  const worldClockPart2Ref = useRef(null);
+  const [worldClockPart2Height, setWorldClockPart2Height] = useState(null); // null = 自動（等於下面的 cap 上限）
+  const [isDraggingWorldClock, setIsDraggingWorldClock] = useState(false);
+  const worldClockDragRef = useRef(null); // { startY, startHeight }
+
+  function getWorldClockPart2Cap() {
+    if (typeof window === 'undefined') return 240;
+    // 大約抓畫面高度的 3 成當作可視高度上限，太高（平板／桌機）或太矮（小手機）都夾在合理範圍內
+    return Math.max(160, Math.min(320, Math.round(window.innerHeight * 0.3)));
+  }
+  const [worldClockPart2Cap, setWorldClockPart2Cap] = useState(getWorldClockPart2Cap);
+  useEffect(() => {
+    function onResize() { setWorldClockPart2Cap(getWorldClockPart2Cap()); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const worldClockPart2VisibleHeight = worldClockPart2Height != null ? worldClockPart2Height : worldClockPart2Cap;
+
+  // 「時間軸」標題列拖曳收合世界時鐘 Part2：原本每個 pointermove 都直接 setState，
+  // 而 Part2 的高度變化會牽動整棵世界時鐘元件樹（含裡面的時鐘卡片、國旗 portal 等）重新渲染，
+  // 手指一移動就整棵重繪一次，在效能較弱的手機上會明顯卡頓、跟不上手指。
+  // 改成拖曳過程中直接改 DOM 節點的 style.maxHeight（略過 React 的 render），
+  // 並用 requestAnimationFrame 把同一輪裡多次的 pointermove 事件合併成一次，
+  // 讓拖曳畫面能跟上螢幕更新率；真正的 React state 只在放開手指的那一刻提交一次即可。
+  const worldClockDragFrameRef = useRef(null);
+  function handleWorldClockDragStart(clientY) {
+    worldClockDragRef.current = { startY: clientY, startHeight: worldClockPart2VisibleHeight, pendingHeight: worldClockPart2VisibleHeight };
+    setIsDraggingWorldClock(true);
+  }
+  function handleWorldClockDragMove(clientY) {
+    if (!worldClockDragRef.current) return;
+    if (worldClockDragFrameRef.current) cancelAnimationFrame(worldClockDragFrameRef.current);
+    worldClockDragFrameRef.current = requestAnimationFrame(() => {
+      if (!worldClockDragRef.current) return;
+      const { startY, startHeight } = worldClockDragRef.current;
+      const next = Math.max(0, Math.min(startHeight + (clientY - startY), worldClockPart2Cap));
+      worldClockDragRef.current.pendingHeight = next;
+      const el = worldClockPart2Ref.current;
+      if (el) el.style.maxHeight = `${next}px`;
+    });
+  }
+  function handleWorldClockDragEnd() {
+    if (worldClockDragFrameRef.current) { cancelAnimationFrame(worldClockDragFrameRef.current); worldClockDragFrameRef.current = null; }
+    const finalHeight = worldClockDragRef.current ? worldClockDragRef.current.pendingHeight : worldClockPart2VisibleHeight;
+    worldClockDragRef.current = null;
+    setIsDraggingWorldClock(false);
+    // 如果已經拉回接近上限，改回「自動」模式，之後畫面高度變化／清單內容改變才能自動跟著調整
+    setWorldClockPart2Height(finalHeight >= worldClockPart2Cap - 1 ? null : finalHeight);
+  }
+
+  // ---- 帳號登入／雲端同步 ----
+  const [fbUser, setFbUser] = useState(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingMerge, setPendingMerge] = useState(null); // { local, cloud } 需要使用者選擇時才會有值
+  const [syncStatus, setSyncStatus] = useState(null); // null | 'syncing' | 'synced'
+  const syncReadyRef = useRef(false); // 是否已經完成登入時的資料比對／合併，之後才開始自動推送變更
+  const mergeCheckedUidRef = useRef(null); // 避免同一次登入重複檢查合併
+
+  // App 啟動時：先處理「Email 免密碼登入連結」回跳，再開始監聽登入狀態
+  useEffect(() => {
+    (async () => {
+      try { await completeEmailLinkSignInIfNeeded(); } catch (err) {}
+    })();
+    const unsub = watchAuthState(u => {
+      setFbUser(u);
+      if (!u) { syncReadyRef.current = false; mergeCheckedUidRef.current = null; setSyncStatus(null); }
+    });
+    return () => unsub();
+  }, []);
+
+  // 登入後：比對本機資料與雲端資料，決定要合併、直接採用，還是跳出選項讓使用者決定
+  useEffect(() => {
+    if (!loaded || !fbUser) return;
+    if (mergeCheckedUidRef.current === fbUser.uid) return;
+    mergeCheckedUidRef.current = fbUser.uid;
+    (async () => {
+      const localData = { clocks, events, lang, isDark, customIcons };
+      const hasLocalData = clocks.length > 0 || events.length > 0;
+      let cloudData = null;
+      try { cloudData = await loadCloudData(fbUser.uid); } catch (err) {}
+
+      if (!cloudData) {
+        try { await saveCloudData(fbUser.uid, localData); } catch (err) {}
+        syncReadyRef.current = true;
+        setSyncStatus('synced');
+        return;
+      }
+      if (!hasLocalData) {
+        applyCloudData(cloudData);
+        syncReadyRef.current = true;
+        setSyncStatus('synced');
+        return;
+      }
+      const sameData = stableStringify({ clocks: cloudData.clocks || [], events: cloudData.events || [] })
+        === stableStringify({ clocks, events });
+      if (sameData) {
+        syncReadyRef.current = true;
+        setSyncStatus('synced');
+        return;
+      }
+      setPendingMerge({ local: localData, cloud: cloudData });
+    })();
+  }, [fbUser, loaded]);
+
+  function applyCloudData(data) {
+    if (Array.isArray(data.clocks)) setClocks(data.clocks);
+    if (Array.isArray(data.events)) setEvents(data.events);
+    if (typeof data.lang === 'string' && LANGS.includes(data.lang)) setLang(data.lang);
+    if (typeof data.isDark === 'boolean') setIsDark(data.isDark);
+    if (Array.isArray(data.customIcons)) setCustomIcons(data.customIcons);
+  }
+
+  function resolveMerge(choice) {
+    if (!pendingMerge || !fbUser) return;
+    const { local, cloud } = pendingMerge;
+    let final;
+    if (choice === 'cloud') {
+      final = cloud;
+    } else if (choice === 'local') {
+      final = local;
+    } else {
+      const byId = (a, b) => {
+        const map = new Map();
+        [...(a || []), ...(b || [])].forEach(item => { if (item && item.id != null) map.set(item.id, item); });
+        return Array.from(map.values());
+      };
+      final = {
+        clocks: byId(local.clocks, cloud.clocks),
+        events: byId(local.events, cloud.events),
+        lang: local.lang,
+        isDark: local.isDark,
+        customIcons: Array.from(new Set([...(local.customIcons || []), ...(cloud.customIcons || [])])),
+      };
+    }
+    applyCloudData(final);
+    saveCloudData(fbUser.uid, final).catch(err => {});
+    setPendingMerge(null);
+    syncReadyRef.current = true;
+    setSyncStatus('synced');
+  }
+
+  // 已登入且合併流程結束後，本機資料一有變動就（去抖動地）推送到雲端
+  useEffect(() => {
+    if (!loaded || !fbUser || !syncReadyRef.current) return;
+    setSyncStatus('syncing');
+    const timer = setTimeout(() => {
+      saveCloudData(fbUser.uid, { clocks, events, lang, isDark, customIcons })
+        .then(() => setSyncStatus('synced'))
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [clocks, events, lang, isDark, customIcons, fbUser, loaded]);
+
+
+  useEffect(() => {
+    (async () => {
+      try { const g = await window.storage.get(INVITE_KEY, false); if (g && g.value === 'true') setUnlocked(true); } catch (err) {}
+      try { const e = await window.storage.get(EVENTS_KEY, false); if (e && e.value) setEvents(JSON.parse(e.value)); } catch (err) {}
+      try { const c = await window.storage.get(CLOCKS_KEY, false); if (c && c.value) setClocks(JSON.parse(c.value)); } catch (err) {}
+      try { const l = await window.storage.get(LANG_KEY, false); if (l && l.value && LANGS.includes(l.value)) setLang(l.value); } catch (err) {}
+      try { const d = await window.storage.get(DARK_KEY, false); if (d && d.value) setIsDark(d.value === 'true'); } catch (err) {}
+      try { const ci = await window.storage.get(CUSTOM_ICONS_KEY, false); if (ci && ci.value) setCustomIcons(JSON.parse(ci.value)); } catch (err) {}
+      try { const h = await window.storage.get(HOME_TZ_ID_KEY, false); if (h && h.value) setHomeTzId(h.value); } catch (err) {}
+      try { const ne = await window.storage.get(NOTIFY_ENABLED_KEY, false); if (ne && ne.value) setNotifyEnabled(ne.value === 'true'); } catch (err) {}
+      try { const nd = await window.storage.get(NOTIFY_DAYS_BEFORE_KEY, false); if (nd && nd.value) { const v = parseInt(nd.value, 10); if (Number.isFinite(v)) setNotifyDaysBefore(Math.max(0, Math.min(365, v))); } } catch (err) {}
+      try { const nl = await window.storage.get(NOTIFY_LOG_KEY, false); if (nl && nl.value) setNotifyLog(JSON.parse(nl.value)); } catch (err) {}
+      setAuthChecked(true);
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => { if (loaded) window.storage.set(EVENTS_KEY, JSON.stringify(events), false).catch(err => console.error(err)); }, [events, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(CLOCKS_KEY, JSON.stringify(clocks), false).catch(err => console.error(err)); }, [clocks, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(LANG_KEY, lang, false).catch(err => console.error(err)); }, [lang, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(DARK_KEY, String(isDark), false).catch(err => console.error(err)); }, [isDark, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(CUSTOM_ICONS_KEY, JSON.stringify(customIcons), false).catch(err => console.error(err)); }, [customIcons, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(HOME_TZ_ID_KEY, homeTzId || '', false).catch(err => console.error(err)); }, [homeTzId, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(NOTIFY_ENABLED_KEY, String(notifyEnabled), false).catch(err => console.error(err)); }, [notifyEnabled, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(NOTIFY_DAYS_BEFORE_KEY, String(notifyDaysBefore), false).catch(err => console.error(err)); }, [notifyDaysBefore, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(NOTIFY_LOG_KEY, JSON.stringify(notifyLog), false).catch(err => console.error(err)); }, [notifyLog, loaded]);
+
+  // ---- 事件倒數日通知提醒：權限請求 + 定時檢查 ----
+  // 開啟通知的那一刻才跟瀏覽器要權限（不會一進 App 就跳權限視窗打擾使用者）；
+  // 使用者若拒絕，開關會自動彈回關閉狀態，並顯示提示文字（見 NotifySettingsButton）。
+  async function handleToggleNotify(next) {
+    if (next) {
+      if (typeof Notification === 'undefined') { setNotifyPermission('unsupported'); setNotifyEnabled(false); return; }
+      let perm = Notification.permission;
+      if (perm === 'default') {
+        try { perm = await Notification.requestPermission(); } catch (err) { perm = 'denied'; }
+        setNotifyPermission(perm);
+      }
+      if (perm !== 'granted') { setNotifyEnabled(false); return; }
+    }
+    setNotifyEnabled(next);
+  }
+
+  // 用 ref 保存「檢查函式要用到的最新值」，這樣下面 setInterval／visibilitychange 監聽器
+  // 掛載時捕捉到的 closure 才不會用到過期的資料（例如使用者切換語言、改了提前天數之後，
+  // 排程仍是一小時前掛上去的那個 interval，若沒用 ref 就會一直用到當時的舊值）
+  const notifyEnabledRef = useRef(notifyEnabled);
+  const notifyDaysBeforeRef = useRef(notifyDaysBefore);
+  const notifyLogRef = useRef(notifyLog);
+  const eventsRef = useRef(events);
+  const langRef = useRef(lang);
+  useEffect(() => { notifyEnabledRef.current = notifyEnabled; }, [notifyEnabled]);
+  useEffect(() => { notifyDaysBeforeRef.current = notifyDaysBefore; }, [notifyDaysBefore]);
+  useEffect(() => { notifyLogRef.current = notifyLog; }, [notifyLog]);
+  useEffect(() => { eventsRef.current = events; }, [events]);
+  useEffect(() => { langRef.current = lang; }, [lang]);
+
+  // 檢查所有事件，剛好落在「提前 N 天」那一天就發系統通知。用 targetDate（實際發生日期）
+  // 而不是 diffDays 數字當作「有沒有通知過」的 key，重複性事件（生日）明年走到同樣的天數
+  // 才不會被誤判成已經通知過而漏發。
+  function checkEventNotifications() {
+    if (!notifyEnabledRef.current) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    const today = new Date();
+    const daysBefore = notifyDaysBeforeRef.current;
+    const currentLog = notifyLogRef.current;
+    const tt = STRINGS[langRef.current];
+    let nextLog = null;
+    eventsRef.current.forEach(ev => {
+      const targetDate = getEffectiveDate(ev, today);
+      const targetTime = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()).getTime();
+      const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+      const diffDays = Math.ceil((targetTime - todayTime) / (1000 * 60 * 60 * 24));
+      if (diffDays !== daysBefore) return;
+      const occurrenceKey = `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}-${targetDate.getDate()}`;
+      if (currentLog[ev.id] === occurrenceKey) return; // 這次occurrence已經通知過了
+      try {
+        new Notification(tt.notifyTitle(ev.title), { body: tt.notifyBody(daysBefore), tag: `event-${ev.id}-${occurrenceKey}` });
+      } catch (err) { /* 通知失敗（例如瀏覽器限制）就靜默跳過，不影響其他事件的檢查 */ }
+      if (!nextLog) nextLog = { ...currentLog };
+      nextLog[ev.id] = occurrenceKey;
+    });
+    if (nextLog) { notifyLogRef.current = nextLog; setNotifyLog(nextLog); }
+  }
+
+  // 開啟通知後：先立刻檢查一次，之後每小時檢查一次（涵蓋跨午夜、電腦睡眠喚醒等情況），
+  // 分頁從背景切回前景時也順手檢查一次，這樣不用一直開著分頁狂刷也能及時收到提醒
+  useEffect(() => {
+    if (!loaded || !notifyEnabled) return;
+    checkEventNotifications();
+    const iv = setInterval(checkEventNotifications, 60 * 60 * 1000);
+    function onVisible() { if (document.visibilityState === 'visible') checkEventNotifications(); }
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVisible); };
+  }, [loaded, notifyEnabled]);
+
+  // 新增／編輯事件、或調整了提前天數之後，也順手檢查一次——例如剛好新增一筆事件，
+  // 目標日期正好落在提前天數上，不用等到下一次每小時排程才發現
+  useEffect(() => {
+    if (!loaded || !notifyEnabled) return;
+    checkEventNotifications();
+  }, [events, notifyDaysBefore]);
+
+  // File Handling API consumer：對應 manifest.json 裡的 file_handlers。
+  // 只有在已安裝的 PWA、且瀏覽器支援 window.launchQueue 時才會用得到（目前主要是桌面版 Chrome/Edge），
+  // 不支援的瀏覽器（含大多數手機瀏覽器分頁模式）會直接跳過，完全不影響原本「匯入備份」按鈕那條路徑。
+  // 要等資料先從 window.storage 載入完成（loaded）才處理，避免匯入的資料被隨後的初始載入覆蓋掉。
+  useEffect(() => {
+    if (!loaded) return;
+    if (typeof window === 'undefined' || !('launchQueue' in window) || !window.launchQueue) return;
+    window.launchQueue.setConsumer(async (launchParams) => {
+      if (!launchParams || !launchParams.files || !launchParams.files.length) return;
+      const msgs = STRINGS[lang];
+      try {
+        const file = await launchParams.files[0].getFile();
+        const text = await file.text();
+        const data = await parseBackupPayload(text);
+        if (!data) {
+          setFileHandlerMsg({ type: 'error', text: msgs.backupImportError });
+          return;
+        }
+        applyCloudData(data);
+        setFileHandlerMsg({ type: 'success', text: msgs.backupImportSuccess });
+      } catch (err) {
+        setFileHandlerMsg({ type: 'error', text: STRINGS[lang].backupImportError });
+      }
+    });
+    // 沒有提供取消訂閱的方式，setConsumer 本身是冪等的（重複呼叫只是覆蓋掉上一個 consumer），
+    // 所以這裡不需要、也不能回傳 cleanup function。
+  }, [loaded, lang]);
+
+  // 匯入提示條幾秒後自動消失，不需要使用者手動關閉
+  useEffect(() => {
+    if (!fileHandlerMsg) return;
+    const timer = setTimeout(() => setFileHandlerMsg(null), 4000);
+    return () => clearTimeout(timer);
+  }, [fileHandlerMsg]);
+  // 頁面底色改放到 <body> 上（而非包在最外層 div），這樣「置底」的測試版水印（負 z-index）
+  // 才能疊在 body 底色之上、又被 App 內容蓋住其不透明的部分，達到「鋪在最底層」的效果。
+  useEffect(() => { document.body.style.background = isDark ? '#121419' : '#FFFFFF'; }, [isDark]);
+
+  const t = STRINGS[lang];
+  const now = nowTick;
+  const todayStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { month: 'long', day: 'numeric', weekday: 'long' }).format(now);
+  const greeting = getGreetingInfo(now, homeTz);
+
+  const cssVars = isDark ? {
+    '--ink': '#F2F3F6',
+    '--ink-soft': 'rgba(242,243,246,0.55)',
+    '--card-bg': '#1D2029',
+    '--card-border': '#2B2F3A',
+    '--input-bg': '#232733',
+    '--page-bg': '#121419',
+    '--header-bg': 'rgba(18,20,25,0.8)',
+  } : {
+    '--ink': '#232733',
+    '--ink-soft': 'rgba(35,39,51,0.55)',
+    '--card-bg': '#F7F8FA',
+    '--card-border': '#ECEDF1',
+    '--input-bg': '#FFFFFF',
+    '--page-bg': '#FFFFFF',
+    '--header-bg': 'rgba(255,255,255,0.8)',
+  };
+
+  if (!authChecked) return null;
+
+  // 邀請碼機制暫時停用（如需重新啟用，把下面這個 if 區塊的註解拿掉即可）
+  // if (!unlocked) {
+  //   return (
+  //     <div style={{ ...cssVars }}>
+  //       <InviteGate lang={lang} t={t} onUnlocked={() => setUnlocked(true)} />
+  //     </div>
+  //   );
+  // }
+
+  return (
+    <>
+      <div className="flex flex-col overflow-hidden" style={{ ...cssVars, height: '100dvh', background: 'transparent', fontFamily: "'Inter', sans-serif", transition: 'background 0.2s' }}>
+        {/* Header — 固定不動，不再需要 sticky（父層本身已不捲動）。
+            這裡的 backdropFilter 會讓 header 自成一個新的堆疊環境（stacking context），
+            裡面「切換語言」選單雖然設了 z-20，範圍也只在 header 自己這個環境內有效；
+            header 跟下面的 <main> 是同一層的手足元素，沒有明確 z-index 時瀏覽器會照 DOM
+            順序疊圖，導致排在後面的 <main>（例如世界時鐘的「添加時區」按鈕）蓋掉了 header
+            展開的語言選單。加上 zIndex 讓 header 整層明確疊在 main 之上即可解決。 */}
+        <header className="px-6 py-6 flex items-center justify-between flex-shrink-0" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(10px)', position: 'relative', zIndex: 30 }}>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>{t[greeting.key]} {greeting.emoji}</h1>
+            <p className="text-xs font-medium mt-1" style={{ color: INK_SOFT }}>{t.todayIs(todayStr)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="flex items-center justify-center rounded-full flex-shrink-0"
+              style={{ ...glass(), width: 34, height: 34, color: fbUser ? MINT : INK }}
+              title={fbUser ? t.loggedInAs(fbUser.email || fbUser.displayName || '') : t.loginToSync}
+            >
+              <User size={16} />
+            </button>
+            <NotifySettingsButton
+              enabled={notifyEnabled}
+              onToggle={handleToggleNotify}
+              daysBefore={notifyDaysBefore}
+              setDaysBefore={setNotifyDaysBefore}
+              permission={notifyPermission}
+              t={t}
+            />
+            <button
+              onClick={() => setIsDark(v => !v)}
+              className="flex items-center justify-center rounded-full flex-shrink-0"
+              style={{ ...glass(), width: 34, height: 34, color: INK }}
+            >
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <LangSwitcher lang={lang} setLang={setLang} />
+          </div>
+        </header>
+
+        {/* Main Content */}
+        {isLargeScreen ? (
+          /* 折叠屏展開／平板／桌面等大屏：左右分欄——世界時鐘固定在左側、時間軸在右側獨立捲動
+             （類似郵件 App 左右分欄），版面本身固定不變。點卡片開啟「地標詳情」或「目前位置時鐘詳情」
+             時不再切換版面，改成跟手機版一樣的置中彈窗（見 WorldClockSection／TimelineSection
+             內部各自的 createPortal），彈窗大小用 max-w-sm／max-h-[85vh] 這種相對單位自動適應螢幕，
+             點彈窗外部空白處即可關閉。 */
+          <main className="px-6 md:px-10 max-w-[1180px] mx-auto w-full flex-1 min-h-0 flex flex-row gap-6 pb-4">
+            <div className="flex-shrink-0" style={{ width: 'clamp(300px, 34vw, 380px)' }}>
+              <WorldClockSection
+                clocks={clocks}
+                setClocks={setClocks}
+                lang={lang}
+                t={t}
+                onHomeTzChange={setHomeTz}
+                homeTzId={homeTzId}
+                setHomeTzId={setHomeTzId}
+                part2Ref={worldClockPart2Ref}
+                part2Height={worldClockPart2VisibleHeight}
+                isDraggingWorldClock={isDraggingWorldClock}
+                isLargeScreen
+                unlimitedHeight
+                clockModalOpen={clockModalOpen}
+                setClockModalOpen={openClockModalSafe}
+              />
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <TimelineSection
+                events={events}
+                setEvents={setEvents}
+                lang={lang}
+                t={t}
+                now={now}
+                isDark={isDark}
+                customIcons={customIcons}
+                setCustomIcons={setCustomIcons}
+                isLargeScreen
+                viewingId={viewingId}
+                setViewingId={setViewingIdSafe}
+              />
+            </div>
+          </main>
+        ) : (
+          /* 手機直向：維持原本上下排列——世界時鐘固定在上方，時間軸在下方獨立捲動容器 */
+          <main className="px-6 max-w-md mx-auto w-full flex-1 min-h-0 flex flex-col">
+            <div id="world-clock-section-root" className="flex-shrink-0">
+              <WorldClockSection
+                clocks={clocks}
+                setClocks={setClocks}
+                lang={lang}
+                t={t}
+                onHomeTzChange={setHomeTz}
+                homeTzId={homeTzId}
+                setHomeTzId={setHomeTzId}
+                part2Ref={worldClockPart2Ref}
+                part2Height={worldClockPart2VisibleHeight}
+                isDraggingWorldClock={isDraggingWorldClock}
+                clockModalOpen={clockModalOpen}
+                setClockModalOpen={openClockModalSafe}
+              />
+            </div>
+            <TimelineSection
+              events={events}
+              setEvents={setEvents}
+              lang={lang}
+              t={t}
+              now={now}
+              isDark={isDark}
+              customIcons={customIcons}
+              setCustomIcons={setCustomIcons}
+              onHeaderDragStart={handleWorldClockDragStart}
+              onHeaderDragMove={handleWorldClockDragMove}
+              onHeaderDragEnd={handleWorldClockDragEnd}
+              viewingId={viewingId}
+              setViewingId={setViewingIdSafe}
+            />
+          </main>
+        )}
+      </div>
+      {showAuthModal && (
+        <AuthModal
+          lang={lang} t={t} user={fbUser} onClose={() => setShowAuthModal(false)}
+          backupData={{ clocks, events, lang, isDark, customIcons }}
+          onImportBackup={applyCloudData}
+        />
+      )}
+      {pendingMerge && <MergeDialog t={t} onResolve={resolveMerge} />}
+      {fileHandlerMsg && (
+        <div
+          className="fixed left-1/2 px-4 py-3 rounded-xl text-sm font-bold text-center shadow-lg"
+          style={{
+            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            maxWidth: '90vw',
+            background: fileHandlerMsg.type === 'success' ? MINT : DANGER,
+            color: '#fff',
+          }}
+        >
+          {fileHandlerMsg.text}
+        </div>
+      )}
+      <Watermark />
+      {SHOW_TEST_WATERMARK && <TestVersionWatermark />}
+    </>
+  );
+}
