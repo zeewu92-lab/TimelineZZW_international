@@ -2,7 +2,7 @@
 <html lang="zh-TW">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=0.75, minimum-scale=0.75, maximum-scale=0.75, user-scalable=no, viewport-fit=cover" />
     <title>時光線</title>
 
     <!-- PWA：讓瀏覽器可以把這個網頁「安裝」到手機主畫面，體驗接近原生 App -->
@@ -28,17 +28,7 @@
         to { opacity: 1; transform: translateY(0); }
       }
       .picker-fade-swap { animation: picker-fade-swap-in 0.25s ease; }
-
-      /* 将整个 #root 容器缩放至 75%，且不出现滚动条 */
-  #root {
-    transform: scale(0.75);
-    transform-origin: top left;
-    width: 133.333vw;   /* 100% / 0.75 = 133.33% */
-    height: 133.333vh;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-  }
+      
 </style>
   </head>
   <body>
