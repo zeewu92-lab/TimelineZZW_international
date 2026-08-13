@@ -28,7 +28,21 @@
         to { opacity: 1; transform: translateY(0); }
       }
       .picker-fade-swap { animation: picker-fade-swap-in 0.25s ease; }
-    </style>
+    <style>
+  /* #root 的灰階濾鏡轉場：讓「新增地標」視窗開關時，背景變灰/還原有平滑過渡，而不是瞬間切換 */
+  #root { transition: filter 0.3s ease; }
+  /* 新增地標視窗裡，切換「關懷模式」時圖示／顏色整組替換的淡入動畫 */
+  @keyframes picker-fade-swap-in {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .picker-fade-swap { animation: picker-fade-swap-in 0.25s ease; }
+
+  /* 🔽 新增这行，强制默认缩放为 75% */
+  html {
+    zoom: 0.75;
+  }
+</style>
   </head>
   <body>
     <div id="root"></div>
