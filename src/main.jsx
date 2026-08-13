@@ -3,7 +3,29 @@ import './lib/storage.js'; // 必须在 App 之前引入，注入 window.storage
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
+// ===== 通过修改 viewport 强制固定缩放 =====
+(function setFixedZoom() {
+  if (typeof document === 'undefined') return;
 
+  const targetZoom = 0.75; 
+  const meta = document.querySelector('meta[name=viewport]');
+
+  if (meta) {
+    // 直接覆盖 viewport，强制 initial-scale = 0.75
+    meta.setAttribute(
+      'content',
+      `width=device-width, initial-scale=${targetZoom}, minimum-scale=${targetZoom}, maximum-scale=${targetZoom}, user-scalable=no, viewport-fit=cover`
+    );
+  }
+})();
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+// ... 后面 Service Worker 注册代码保持不变
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
