@@ -28,7 +28,17 @@
         to { opacity: 1; transform: translateY(0); }
       }
       .picker-fade-swap { animation: picker-fade-swap-in 0.25s ease; }
-      
+
+      /* 将整个 #root 容器缩放至 75%，且不出现滚动条 */
+  #root {
+    transform: scale(0.75);
+    transform-origin: top left;
+    width: 133.333vw;   /* 100% / 0.75 = 133.33% */
+    height: 133.333vh;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+  }
 </style>
   </head>
   <body>
