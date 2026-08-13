@@ -4,6 +4,34 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 
+// ===== 自适应缩放＋窗口变化防抖 =====
+(function initZoom() {
+  if (typeof window === 'undefined') return;
+
+  const designWidth = 390; // 设计稿基准宽度
+  let resizeTimer = null;
+
+  function applyZoom() {
+    const screenWidth = window.innerWidth;
+    // 计算缩放系数：屏幕越宽，缩放越小；但最小不低于 0.5，最大不超过 1
+    let scale = designWidth / screenWidth;
+    scale = Math.max(0.5, Math.min(1, scale));
+    document.documentElement.style.zoom = scale;
+  }
+
+  // 首次加载时应用
+  applyZoom();
+
+  // 窗口大小变化时重新计算（防抖 200ms，避免频繁触发）
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      applyZoom();
+      resizeTimer = null;
+    }, 200);
+  });
+})();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
