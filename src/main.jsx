@@ -16,11 +16,11 @@ import App from './App.jsx';
     // ===== 分段判断：根据屏幕宽度使用不同策略 =====
     if (screenWidth >= 600) {
       // 大屏模式（折叠屏展开、平板）：固定缩放，避免内容太小
-      scale = 0.75;
+      scale = 0.72;
     } else if (screenWidth >= 400) {
       // 中等屏幕（普通手机竖屏）：自适应缩放，范围控制在 0.78~0.88
       scale = 390 / screenWidth;
-      scale = Math.max(0.78, Math.min(0.88, scale));
+      scale = Math.max(0.72, Math.min(0.82, scale));
     } else {
       // 小屏幕（窄手机）：自适应缩放，范围控制在 0.85~0.95
       scale = 390 / screenWidth;
