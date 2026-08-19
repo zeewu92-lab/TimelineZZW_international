@@ -419,7 +419,7 @@ const STRINGS = {
     albumBackupReminder: '「本機備份」可完整保存您上傳的照片及相關數據。為降低數據遺失風險，添加照片後請及時使用「本機備份」保存，並建議另行使用可靠的雲端儲存服務進行備份。',
     addPhotoHintTitle: '新增相片前的提醒', abandonAdd: '放棄添加', gotItLabel: '我已知悉', gotItLabelCountdown: n => `我已知悉（${n}）`,
     deleteSelectedAlbumsConfirmTitle: '刪除已選取的相冊？', deleteSelectedAlbumsConfirmDesc: n => `此動作無法復原，確定要刪除已選取的 ${n} 個相冊嗎？相冊內的相片也會一併刪除。`,
-    deleteSelectedPhotosConfirmTitle: '刪除已選取的相片？', deleteSelectedPhotosConfirmDesc: n => `此動作無法復原，確定要刪除已選取的 ${n} 張相片嗎？`,
+    deleteSelectedPhotosConfirmTitle: '刪除已選取的相片？', deleteSelectedPhotosConfirmDesc: n => `如您未進行本機備份，此動作無法復原，確定要刪除已選取的 ${n} 張相片嗎？`,
     backupSlowdownHint: '添加照片後，備份檔案的容量可能增加，「本機備份」的匯入與匯出速度也可能因此變慢，請耐心等待。',
     email: 'Email', password: '密碼', login: '登入', signup: '註冊',
     switchToSignup: '還沒有帳號？註冊', switchToLogin: '已有帳號？登入',
@@ -512,7 +512,7 @@ const STRINGS = {
     albumBackupReminder: '"Local Backup" fully preserves your uploaded photos and related data. To reduce the risk of data loss, please use "Local Backup" promptly after adding photos, and we also recommend backing up separately with a reliable cloud storage service.',
     addPhotoHintTitle: 'Before you add a photo', abandonAdd: 'Cancel', gotItLabel: 'Got it', gotItLabelCountdown: n => `Got it (${n})`,
     deleteSelectedAlbumsConfirmTitle: 'Delete the selected albums?', deleteSelectedAlbumsConfirmDesc: n => `This cannot be undone. Delete the ${n} selected album${n === 1 ? '' : 's'}? Photos inside will be deleted too.`,
-    deleteSelectedPhotosConfirmTitle: 'Delete the selected photos?', deleteSelectedPhotosConfirmDesc: n => `This cannot be undone. Delete the ${n} selected photo${n === 1 ? '' : 's'}?`,
+    deleteSelectedPhotosConfirmTitle: 'Delete the selected photos?', deleteSelectedPhotosConfirmDesc: n => `Unless you've made a local backup, this cannot be undone. Delete the ${n} selected photo${n === 1 ? '' : 's'}?`,
     backupSlowdownHint: 'As you add more photos, the backup file size may grow, which can slow down "Local Backup" import and export — please be patient.',
     email: 'Email', password: 'Password', login: 'Log in', signup: 'Sign up',
     switchToSignup: "Don't have an account? Sign up", switchToLogin: 'Already have an account? Log in',
@@ -605,7 +605,7 @@ const STRINGS = {
     albumBackupReminder: '「ローカルバックアップ」を使うと、アップロードした写真と関連データをまとめて保存できます。データ消失のリスクを減らすため、写真を追加したら早めに「ローカルバックアップ」で保存し、あわせて信頼できるクラウドストレージサービスでも別途バックアップすることをおすすめします。',
     addPhotoHintTitle: '写真を追加する前に', abandonAdd: '追加をやめる', gotItLabel: '理解しました', gotItLabelCountdown: n => `理解しました（${n}）`,
     deleteSelectedAlbumsConfirmTitle: '選択したアルバムを削除しますか？', deleteSelectedAlbumsConfirmDesc: n => `この操作は取り消せません。選択した${n}件のアルバムを削除しますか？アルバム内の写真も一緒に削除されます。`,
-    deleteSelectedPhotosConfirmTitle: '選択した写真を削除しますか？', deleteSelectedPhotosConfirmDesc: n => `この操作は取り消せません。選択した${n}枚の写真を削除しますか？`,
+    deleteSelectedPhotosConfirmTitle: '選択した写真を削除しますか？', deleteSelectedPhotosConfirmDesc: n => `ローカルバックアップを取っていない場合、この操作は取り消せません。選択した${n}枚の写真を削除しますか？`,
     backupSlowdownHint: '写真を追加するとバックアップファイルの容量が大きくなることがあり、「ローカルバックアップ」の書き出し・読み込みが遅くなる場合があります。しばらくお待ちください。',
     email: 'メールアドレス', password: 'パスワード', login: 'ログイン', signup: '新規登録',
     switchToSignup: 'アカウントをお持ちでない方は新規登録', switchToLogin: 'アカウントをお持ちの方はログイン',
@@ -698,7 +698,7 @@ const STRINGS = {
     albumBackupReminder: '"로컬 백업"을 사용하면 업로드한 사진과 관련 데이터를 온전히 저장할 수 있습니다. 데이터 손실 위험을 줄이려면 사진을 추가한 후 바로 "로컬 백업"으로 저장하고, 신뢰할 수 있는 클라우드 저장 서비스로도 별도로 백업하는 것을 권장합니다.',
     addPhotoHintTitle: '사진을 추가하기 전에', abandonAdd: '추가 취소', gotItLabel: '확인했어요', gotItLabelCountdown: n => `확인했어요（${n}）`,
     deleteSelectedAlbumsConfirmTitle: '선택한 앨범을 삭제할까요?', deleteSelectedAlbumsConfirmDesc: n => `이 작업은 되돌릴 수 없습니다. 선택한 앨범 ${n}개를 삭제하시겠습니까? 앨범 속 사진도 함께 삭제됩니다.`,
-    deleteSelectedPhotosConfirmTitle: '선택한 사진을 삭제할까요?', deleteSelectedPhotosConfirmDesc: n => `이 작업은 되돌릴 수 없습니다. 선택한 사진 ${n}장을 삭제하시겠습니까?`,
+    deleteSelectedPhotosConfirmTitle: '선택한 사진을 삭제할까요?', deleteSelectedPhotosConfirmDesc: n => `로컬 백업을 하지 않았다면 이 작업은 되돌릴 수 없습니다. 선택한 사진 ${n}장을 삭제하시겠습니까?`,
     backupSlowdownHint: '사진을 추가하면 백업 파일 용량이 커질 수 있어 "로컬 백업"의 가져오기/내보내기 속도가 느려질 수 있습니다. 잠시만 기다려 주세요.',
     email: '이메일', password: '비밀번호', login: '로그인', signup: '회원가입',
     switchToSignup: '계정이 없으신가요? 회원가입', switchToLogin: '이미 계정이 있으신가요? 로그인',
@@ -5448,25 +5448,26 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
         document.body
       )}
 
-      {/* 「新增相片」提醒視窗：點「新增相片」時彈出（見 handleAddPhotoClick），內容沿用原本固定顯示
-          在視窗底部的那段備份提醒文字。「我已知悉」按鈕要等 6 秒倒數結束才能點——倒數期間顯示
-          剩餘秒數、按鈕呈現半透明的停用樣式；按下後記住已讀狀態（ALBUM_ADD_HINT_ACKED_KEY），
-          之後點「新增相片」就不會再看到這個視窗，並直接接著開檔案選擇窗。「放棄添加」或點背景
-          則單純關掉視窗，不記住已讀、也不開檔案選擇窗，下次點「新增相片」還是會再看到一次。
+      {/* 「新增相片」提醒視窗：點「新增相片」時彈出（見 handleAddPhotoClick），內容包含兩段提醒文字——
+          第一段是原本固定顯示在視窗底部的備份提醒（albumBackupReminder），第二段是原本顯示在「本機
+          備份」區塊裡、提醒備份匯入匯出速度可能變慢的文字（backupSlowdownHint），移進來一併顯示。
+          「我已知悉」按鈕要等 6 秒倒數結束才能點——倒數期間顯示剩餘秒數、按鈕呈現半透明的停用樣式；
+          按下後記住已讀狀態（ALBUM_ADD_HINT_ACKED_KEY），之後點「新增相片」就不會再看到這個視窗，
+          並直接接著開檔案選擇窗。這個視窗刻意做得比較強硬：不支援按 ESC 或點背景關閉，只能按
+          「放棄添加」或等倒數結束按「我已知悉」，兩者都不會記住已讀狀態（只有「我已知悉」會）。
           視覺風格跟下面兩個批量刪除確認視窗、以及「刪除地標」確認視窗統一：置中彈窗＋毛玻璃卡片。 */}
       {showAddHintModal && createPortal(
         <div
           className="fixed inset-0 flex items-center justify-center px-6"
           style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
-          onClick={abandonAddPhoto}
         >
           <div
             className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
             style={{ ...AUTH_GLASS }}
-            onClick={e => e.stopPropagation()}
           >
             <h2 className="text-lg font-black" style={{ color: INK }}>{t.addPhotoHintTitle}</h2>
             <p className="text-sm" style={{ color: INK }}>{t.albumBackupReminder}</p>
+            <p className="text-sm" style={{ color: INK }}>{t.backupSlowdownHint}</p>
             <div className="flex items-center gap-2.5">
               <button
                 onClick={abandonAddPhoto}
@@ -5913,8 +5914,8 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
       <div className="flex flex-col gap-2 pt-3 mt-1" style={{ borderTop: CARD_BORDER }}>
         <p className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.backupSectionTitle}</p>
         <p className="text-xs" style={{ color: INK_SOFT }}>{t.backupHint}</p>
-        {/* 提醒使用者：相片會讓備份檔變大，匯入／匯出速度可能因此變慢，請耐心等待。 */}
-        <p className="text-[11px] leading-snug" style={{ color: INK_SOFT }}>{t.backupSlowdownHint}</p>
+        {/* 原本這裡有一段「相片會讓備份檔變大，匯入／匯出速度可能因此變慢」的提醒（backupSlowdownHint），
+            已經移到「新增相片」前的提醒視窗裡，跟 albumBackupReminder 一起分兩段顯示，這裡不再重複。 */}
         <div className="flex gap-2">
           <button
             type="button"
