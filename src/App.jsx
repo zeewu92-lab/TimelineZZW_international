@@ -2491,11 +2491,24 @@ async function buildEventCardCanvas(ev, lang, t, isDark) {
   let cardInk = colors.ink;
   let cardInkSoft = colors.inkSoft;
 
+  const glassCleared = ev.bgOverlayOpacity === -1;
+  // 跟卡片預覽（EventDetailModal 裡的 bgOpacity／overlaySliderValue）用同一套公式，
+  // 這樣「遮罩透明度 <= 35」的判斷門檻在預覽跟匯出圖片之間才會完全一致。
+  const exportBgOpacity = glassCleared ? 0 : Math.max(0, Math.min(1, ev.bgOverlayOpacity != null ? ev.bgOverlayOpacity : 0));
+  const exportOverlaySliderValue = Math.round((1 - exportBgOpacity) * 100);
+  // 遮罩顏色跟著 isDark 走（下面 fillStyle：淺色主題白色、深色主題深色 rgba(20,22,28,...)），
+  // 跟卡片預覽現在的行為一致。遮罩不透明度夠高（<=35）時取消跟著原始照片亮度翻轉，改成固定
+  // 顏色，但固定顏色也要跟著遮罩本身的顏色走：白色遮罩固定用黑字，深色遮罩固定用白字，
+  // 不然會變成「黑字疊在幾乎全暗的遮罩上」完全看不見。
+  const overlayNearOpaque = ev.bgImage && !glassCleared && exportOverlaySliderValue <= 35;
+
   if (ev.bgImage) {
     try {
       const img = await loadImageAsync(ev.bgImage);
-      const glassCleared = ev.bgOverlayOpacity === -1;
-      if (isImageDark(img)) {
+      if (overlayNearOpaque) {
+        cardInk = isDark ? '#fff' : '#000';
+        cardInkSoft = isDark ? 'rgba(255,255,255,0.78)' : 'rgba(0,0,0,0.78)';
+      } else if (isImageDark(img)) {
         cardInk = '#fff';
         cardInkSoft = 'rgba(255,255,255,0.78)';
       }
@@ -2507,10 +2520,8 @@ async function buildEventCardCanvas(ev, lang, t, isDark) {
       ctx.fillStyle = colors.cardBg;
       ctx.fillRect(0, 0, w, h);
     }
-    const glassCleared = ev.bgOverlayOpacity === -1;
     if (!glassCleared) {
-      const opacity = ev.bgOverlayOpacity != null ? Math.max(0, Math.min(1, ev.bgOverlayOpacity)) : 0;
-      ctx.fillStyle = isDark ? `rgba(20,22,28,${opacity})` : `rgba(255,255,255,${opacity})`;
+      ctx.fillStyle = isDark ? `rgba(20,22,28,${exportBgOpacity})` : `rgba(255,255,255,${exportBgOpacity})`;
       ctx.fillRect(0, 0, w, h);
     } else {
       // 「原圖模式」：取消 Canvas 模糊與遮罩，直接保留原始圖片。
@@ -2796,18 +2807,9 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
     img.src = ev.bgImage;
     return () => { cancelled = true; };
   }, [ev.bgImage]);
-  // 只有「直接蓋在背景圖片上、自己沒有另外一層實色底色」的文字／圖示，才需要在背景偏暗時
-  // 換成白色，否則像素卡片背景、標籤徽章這些本來就有自己實色底色的元素，字色反而不該跟著換
-  // （不然背景偏亮時的白底配白字、或背景偏暗時深色底配深色字，都會變得完全看不見）。
-  const cardInk = ev.bgImage && bgIsDark ? '#fff' : INK;
-  const cardInkSoft = ev.bgImage && bgIsDark ? 'rgba(255,255,255,0.78)' : INK_SOFT;
 
-  const [uploading, setUploading] = useState(false);
-  const [bgError, setBgError] = useState('');
-  const fileInputRef = useRef(null);
-  // 「調節遮罩透明度」面板的展開狀態：只有設定過自訂背景圖片時才有意義。
-  // bgOverlayOpacity 始終代表「遮罩本身」的不透明度；毛玻璃 blur 效果固定，不由此滑桿控制。
-  const [showOpacityAdjust, setShowOpacityAdjust] = useState(false);
+  // 「調節遮罩透明度」面板要用到的幾個數值，搬到 cardInk 判斷之前，因為下面的黑／白字邏輯
+  // 現在也需要用到 overlaySliderValue（遮罩透明度滑桿數值，0～100）。
   // bgOverlayOpacity 0～1 代表遮罩本身的不透明度；-1 是一個保留值，代表「清除玻璃效果（原圖模式）」。
   // 這樣可以在不新增資料欄位的前提下保存「原圖模式」，也能兼容既有事件資料。
   // 預設（使用者從未調整過）的遮罩不透明度是 0.75，對應滑桿數值 25（=「25% 透明」）。
@@ -2820,6 +2822,26 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
   const SLIDER_MAX = 100;
   // 滑桿數值＝「透明度」，0～100：0 是遮罩完全不透明，100 是遮罩完全消失（等同看到原圖）。
   const overlaySliderValue = Math.round((1 - bgOpacity) * SLIDER_MAX);
+
+  // 只有「直接蓋在背景圖片上、自己沒有另外一層實色底色」的文字／圖示，才需要在背景偏暗時
+  // 換成白色，否則像素卡片背景、標籤徽章這些本來就有自己實色底色的元素，字色反而不該跟著換
+  // （不然背景偏亮時的白底配白字、或背景偏暗時深色底配深色字，都會變得完全看不見）。
+  // 但遮罩透明度（overlaySliderValue）小於等於 35 時，遮罩本身已經蓋得相當不透明，畫面幾乎
+  // 被遮罩蓋掉、看不太出原始照片深淺，這時候還照原始照片亮度翻轉，反而常常看不清楚。
+  // 這種情況直接取消翻轉，改用固定顏色——但遮罩顏色現在跟著 App 深色／淺色模式走（見下面
+  // 遮罩那層 div：淺色模式白色、深色模式改用跟匯出圖片一致的深色 rgba(20,22,28,...)），
+  // 所以固定顏色也要跟著遮罩本身的顏色走：遮罩是白色（淺色模式）時固定用黑色，遮罩是深色
+  // （深色模式）時固定用白色，才不會變成「黑字疊在幾乎全暗的遮罩上」完全看不見。
+  const overlayNearOpaque = ev.bgImage && !glassCleared && overlaySliderValue <= 35;
+  const cardInk = overlayNearOpaque ? (isDark ? '#fff' : '#000') : (ev.bgImage && bgIsDark ? '#fff' : INK);
+  const cardInkSoft = overlayNearOpaque ? (isDark ? 'rgba(255,255,255,0.78)' : 'rgba(0,0,0,0.78)') : (ev.bgImage && bgIsDark ? 'rgba(255,255,255,0.78)' : INK_SOFT);
+
+  const [uploading, setUploading] = useState(false);
+  const [bgError, setBgError] = useState('');
+  const fileInputRef = useRef(null);
+  // 「調節遮罩透明度」面板的展開狀態：只有設定過自訂背景圖片時才有意義。
+  // bgOverlayOpacity 始終代表「遮罩本身」的不透明度；毛玻璃 blur 效果固定，不由此滑桿控制。
+  const [showOpacityAdjust, setShowOpacityAdjust] = useState(false);
   const originalImageLabel = lang === 'zh-TW' ? '原圖' : lang === 'ja' ? '原画像' : lang === 'ko' ? '원본' : 'Original';
   // 「原圖」改成滑桿右側一顆獨立的長條按鈕：記住切換到原圖模式之前的透明度，
   // 這樣再次點擊取消原圖模式時，可以還原回使用者原本調整的數值，而不是每次都跳回預設值。
@@ -3098,7 +3120,11 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
           />
         )}
 
-        {/* 唯一受滑桿控制的白色遮罩：滑桿數值 0～100 對應遮罩從完全不透明到完全消失。
+        {/* 唯一受滑桿控制的遮罩：滑桿數值 0～100 對應遮罩從完全不透明到完全消失。
+            遮罩顏色跟著 App 的深色／淺色模式走（淺色模式白色、深色模式改用跟匯出圖片
+            buildEventCardCanvas 同一個深色 rgba(20,22,28,...)）——原本這裡固定寫死白色，
+            深色模式切換對這個預覽視窗完全沒有視覺差異，只有匯出的圖片才看得出深色遮罩，
+            兩邊不一致。現在預覽跟匯出用同一組顏色，深色模式下也能在這裡直接看到遮罩變化。
             拖動滑桿當下不套用 transition，讓遮罩即時跟著手指變化，不會因為每個畫格都在追
             前一個還沒播完的 90ms 轉場而看起來delay／卡頓；放開手指、或透過按鈕（例如「原圖」）
             觸發的變化才套用平滑轉場。 */}
@@ -3107,7 +3133,7 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
             className="absolute inset-0 rounded-3xl pointer-events-none"
             style={{
               zIndex: 2,
-              background: `rgba(255,255,255,${displayBgOpacity})`,
+              background: isDark ? `rgba(20,22,28,${displayBgOpacity})` : `rgba(255,255,255,${displayBgOpacity})`,
               transition: sliderDragging ? 'none' : 'background 90ms linear',
             }}
           />
