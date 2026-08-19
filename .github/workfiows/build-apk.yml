@@ -3,7 +3,7 @@ name: Build and Release Android APK
 on:
   push:
     tags:
-      - 'v*'  # 当推送 v 开头的 tag 时自动触发，例如 v1.0.10-cn
+      - 'v*'  # 当推送 v 开头的 tag 时自动触发，例如 v1.0.11-cn
   workflow_dispatch:  # 允许在 Actions 页面手动点击运行
 
 jobs:
@@ -24,28 +24,17 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Install Capacitor
-        run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "时光线" "top.timezzw.app" --web-dir=dist
-          npx cap add android
+      - name: Install Capacitor CLI (For syncing)
+        run: npm install @capacitor/cli @capacitor/core
 
-      - name: Generate app icons
-        run: |
-          mkdir -p resources
-          cp public/icon-maskable-512.png resources/icon.png
-          cp public/icon-maskable-512.png resources/icon-foreground.png
-          npm install @capacitor/assets --save-dev
-          npx capacitor-assets generate --android --iconBackgroundColor '#111A2D' --iconBackgroundDark '#111A2D'
-
-      - name: Sync web assets
-        run: npx cap sync
+      - name: Sync web assets to Android
+        run: npx cap sync android
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17' # Android build 建议使用 17
+          java-version: '17'
 
       - name: Decode Keystore
         run: |
