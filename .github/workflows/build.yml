@@ -26,10 +26,18 @@ jobs:
       - name: Build web app
         run: npm run build
 
+      - name: Prepare web assets for Capacitor
+        run: |
+          # 如果編譯出來的是 dist 夾，但 capacitor 需要 www，自動幫它複製一份
+          if [ -d "dist" ] && [ ! -d "www" ]; then
+            cp -r dist www
+          elif [ -d "build" ] && [ ! -d "www" ]; then
+            cp -r build www
+          fi
+
       - name: Install Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          # 如果 android 資料夾不存在才初始化並新增，避免重複報錯
           if [ ! -d "android" ]; then
             npx cap init "時光線" "top.timezzw.app" --web-dir=dist
             npx cap add android
