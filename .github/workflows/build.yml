@@ -30,7 +30,7 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           rm -rf android
-          
+
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "top.timezzw.app",
@@ -88,8 +88,17 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
-      
-   
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEY_STORE_BASE64 }}" | base64 --decode > android/app/release-key.jks
+
+      - name: Verify Keystore
+        run: |
+          keytool -list -v -keystore android/app/release-key.jks \
+            -storepass "${{ secrets.STORE_PASS }}" \
+            -alias "${{ secrets.KEY_ALIAS }}"
+
       - name: Build Release APK
         run: |
           cd android
