@@ -30,9 +30,15 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           rm -rf android
-          # 先自動初始化設定檔，補上 App 名稱與 ID
-          npx cap init "時光線" "top.timezzw.app" --web-dir=dist --yes
-          # 接著再安全地加入 android 平台
+          
+          # 直接用程式碼寫死設定檔，避開所有指令參數錯誤
+          echo '{
+            "appId": "top.timezzw.app",
+            "appName": "時光線",
+            "webDir": "dist",
+            "bundledWebRuntime": false
+          }' > capacitor.config.json
+
           npx cap add android
 
       - name: Generate app icons
