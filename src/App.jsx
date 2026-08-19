@@ -4912,6 +4912,15 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
   const [addHintCountdown, setAddHintCountdown] = useState(6);
   const ADD_HINT_COUNTDOWN_SECONDS = 6;
 
+  // 這裡故意也掛一個 useModalBackClose，close 函式給空函式（不做任何事）：
+  // 外層的「相冊」視窗本身也是靠 useModalBackClose(!!albumEventId, closeAlbumModal) 監聽 ESC／
+  // 瀏覽器返回鍵，只要它是堆疊最上層，按 ESC 或滑動返回就會把整個相冊視窗關掉——先前提醒視窗只
+  // 拿掉了背景點擊關閉，沒有加入同一套堆疊管理，導致相冊視窗仍是「最上層」，按 ESC／返回鍵還是會
+  // 連同提醒視窗一起被關掉。現在提醒視窗開著時，把自己也推進同一個堆疊、堆疊在相冊視窗之上，
+  // 讓相冊視窗的監聽器判斷「不是最上層」而略過，藉此讓 ESC／返回鍵在提醒視窗開著時完全沒有作用，
+  // 而不是導致外層視窗被誤關。
+  useModalBackClose(showAddHintModal, () => {});
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -5455,6 +5464,9 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
           按下後記住已讀狀態（ALBUM_ADD_HINT_ACKED_KEY），之後點「新增相片」就不會再看到這個視窗，
           並直接接著開檔案選擇窗。這個視窗刻意做得比較強硬：不支援按 ESC 或點背景關閉，只能按
           「放棄添加」或等倒數結束按「我已知悉」，兩者都不會記住已讀狀態（只有「我已知悉」會）。
+          ESC／瀏覽器返回鍵在這裡完全不作用：靠上面那個空 close 函式的 useModalBackClose 把自己
+          推進外層「相冊」視窗共用的那個 modal 堆疊、疊在它上面，讓外層相冊視窗自己的 ESC／返回鍵
+          監聽器判斷「輪不到我」而略過，藉此擋掉外層視窗會被連帶關閉的問題。
           視覺風格跟下面兩個批量刪除確認視窗、以及「刪除地標」確認視窗統一：置中彈窗＋毛玻璃卡片。 */}
       {showAddHintModal && createPortal(
         <div
