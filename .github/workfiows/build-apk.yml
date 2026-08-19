@@ -3,7 +3,8 @@ name: Build and Release Android APK
 on:
   push:
     tags:
-      - 'v*'  # 当推送 v 开头的 tag 时自动触发，例如 v1.0.8
+      - 'v*'  # 当推送 v 开头的 tag 时自动触发，例如 v1.0.10-cn
+  workflow_dispatch:  # 允许在 Actions 页面手动点击运行
 
 jobs:
   build:
@@ -63,6 +64,6 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          files: android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
