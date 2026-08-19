@@ -115,14 +115,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASS }}
           STORE_PASSWORD: ${{ secrets.STORE_PASS }}
 
-      - name: Delete existing release with same tag (if any)
-        run: gh release delete "${{ github.ref_name }}" --yes || true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload to Release
+      - name: Upload to Release (as draft)
         uses: softprops/action-gh-release@v2
         with:
           files: android/app/build/outputs/apk/release/app-release.apk
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
