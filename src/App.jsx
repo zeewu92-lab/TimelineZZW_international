@@ -5467,11 +5467,18 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
           ESC／瀏覽器返回鍵在這裡完全不作用：靠上面那個空 close 函式的 useModalBackClose 把自己
           推進外層「相冊」視窗共用的那個 modal 堆疊、疊在它上面，讓外層相冊視窗自己的 ESC／返回鍵
           監聽器判斷「輪不到我」而略過，藉此擋掉外層視窗會被連帶關閉的問題。
+          注意最外層這個 div 上的 onClick={e => e.stopPropagation()}：這個視窗是用 createPortal
+          直接掛到 document.body，但它仍然寫在 AlbumModal 這個元件的 JSX 裡面，而 React 的合成事件
+          是照著 React 元件樹（不是實際 DOM 位置）在冒泡的，所以點擊視窗裡任何地方（包含空白背景）
+          若不擋下來，事件還是會一路冒泡到外層相冊視窗自己那個背景 div 的 onClick={onClose}，
+          導致點空白處看似「點到了空氣」，其實整個相冊視窗被關掉了。這裡擋住冒泡、且自己不做任何
+          關閉動作，才能讓點擊這個視窗（不管點哪裡）真的完全沒有效果。
           視覺風格跟下面兩個批量刪除確認視窗、以及「刪除地標」確認視窗統一：置中彈窗＋毛玻璃卡片。 */}
       {showAddHintModal && createPortal(
         <div
           className="fixed inset-0 flex items-center justify-center px-6"
           style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
+          onClick={e => e.stopPropagation()}
         >
           <div
             className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
@@ -5823,6 +5830,54 @@ function PasswordField({ inputRef, value, onChange, onKeyDown, placeholder, t, c
 }
 
 /* ---------------- 帳號登入 Modal ---------------- */
+// 效能筆記：這支元件原本是定義在 AuthModal 裡面的巢狀函式（每次 AuthModal 重新 render，例如帳號管理
+// 畫面裡打密碼欄位每敲一個字，都會重新產生一個「新」的 BackupSection 函式參照）。React 判斷元件類型
+// 是不是同一個，是直接比對函式參照本身，參照變了就視為完全不同的元件類型，會把整棵子樹整個卸載再重新
+// 掛載一次（不是單純重新 render）——這在打字、切換分頁等高頻互動時會讓匯出／匯入按鈕看起來頓一下、
+// 甚至偶爾吃掉點擊，跟手感差很多。搬到最外層、改吃 props，函式參照固定不變，AuthModal 重新 render
+// 時這裡只會單純重新 render（甚至可以被瀏覽器判斷成同一份 DOM 節點直接更新），不會整段重建。
+function BackupSection({ t, handleExportBackup, importFileRef, handleImportFileChange, backupMsg }) {
+  return (
+    <div className="flex flex-col gap-2 pt-3 mt-1" style={{ borderTop: CARD_BORDER }}>
+      <p className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.backupSectionTitle}</p>
+      <p className="text-xs" style={{ color: INK_SOFT }}>{t.backupHint}</p>
+      {/* 原本這裡有一段「相片會讓備份檔變大，匯入／匯出速度可能因此變慢」的提醒（backupSlowdownHint），
+          已經移到「新增相片」前的提醒視窗裡，跟 albumBackupReminder 一起分兩段顯示，這裡不再重複。 */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleExportBackup}
+          className="flex-1 py-2 rounded-xl text-sm font-bold"
+          style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+        >
+          {t.backupExportBtn}
+        </button>
+        <button
+          type="button"
+          onClick={() => importFileRef.current && importFileRef.current.click()}
+          className="flex-1 py-2 rounded-xl text-sm font-bold"
+          style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
+        >
+          {t.backupImportBtn}
+        </button>
+        <input
+          ref={importFileRef}
+          type="file"
+          accept=".tzzwnb"
+          className="hidden"
+          onChange={handleImportFileChange}
+        />
+      </div>
+
+      {backupMsg && (
+        <p className="text-xs font-bold" style={{ color: backupMsg.type === 'success' ? MINT : DANGER }}>
+          {backupMsg.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
   // 大屏（折叠屏展开／平板／桌面）下把視窗card稍微加寬一些，比例更接近桌面軟體的置中對話框，
   // 不像手機那樣窄窄一條；由於這裡的視窗本來就已經是「置中顯示」（fixed inset-0 + items-center），
@@ -5919,48 +5974,6 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
     reader.onload = () => parseAndImport(String(reader.result));
     reader.onerror = () => setBackupMsg({ type: 'error', text: t.backupImportError });
     reader.readAsText(file);
-  }
-
-  function BackupSection() {
-    return (
-      <div className="flex flex-col gap-2 pt-3 mt-1" style={{ borderTop: CARD_BORDER }}>
-        <p className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.backupSectionTitle}</p>
-        <p className="text-xs" style={{ color: INK_SOFT }}>{t.backupHint}</p>
-        {/* 原本這裡有一段「相片會讓備份檔變大，匯入／匯出速度可能因此變慢」的提醒（backupSlowdownHint），
-            已經移到「新增相片」前的提醒視窗裡，跟 albumBackupReminder 一起分兩段顯示，這裡不再重複。 */}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleExportBackup}
-            className="flex-1 py-2 rounded-xl text-sm font-bold"
-            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
-          >
-            {t.backupExportBtn}
-          </button>
-          <button
-            type="button"
-            onClick={() => importFileRef.current && importFileRef.current.click()}
-            className="flex-1 py-2 rounded-xl text-sm font-bold"
-            style={{ background: 'var(--input-bg)', border: CARD_BORDER, color: INK }}
-          >
-            {t.backupImportBtn}
-          </button>
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".tzzwnb"
-            className="hidden"
-            onChange={handleImportFileChange}
-          />
-        </div>
-
-        {backupMsg && (
-          <p className="text-xs font-bold" style={{ color: backupMsg.type === 'success' ? MINT : DANGER }}>
-            {backupMsg.text}
-          </p>
-        )}
-      </div>
-    );
   }
 
   // 已登入帳號管理：主畫面／修改密碼／註銷確認
@@ -6177,7 +6190,7 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
             </button>
           )}
 
-          <BackupSection />
+          <BackupSection t={t} handleExportBackup={handleExportBackup} importFileRef={importFileRef} handleImportFileChange={handleImportFileChange} backupMsg={backupMsg} />
 
           <button
             onClick={() => run(async () => { await signOutUser(); handleClose(); })}
@@ -6218,7 +6231,7 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
             <button onClick={handleClose} style={{ color: INK_SOFT }}><X size={18} /></button>
           </div>
           <p className="text-sm font-bold" style={{ color: DANGER }}>{t.mainlandCnBlocked}</p>
-          <BackupSection />
+          <BackupSection t={t} handleExportBackup={handleExportBackup} importFileRef={importFileRef} handleImportFileChange={handleImportFileChange} backupMsg={backupMsg} />
         </div>
       </div>
     );
@@ -6326,7 +6339,7 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
           </button>
         )}
 
-        <BackupSection />
+        <BackupSection t={t} handleExportBackup={handleExportBackup} importFileRef={importFileRef} handleImportFileChange={handleImportFileChange} backupMsg={backupMsg} />
       </div>
     </div>
   );
@@ -7038,6 +7051,34 @@ export default function App() {
 
   return (
     <>
+      {/* 全域「跟手」樣式：不是針對單一元件，而是整個 App 共用的一份基礎回饋規則。
+          1. touch-action: manipulation — 部分行動瀏覽器即使關掉雙指縮放，仍可能對可點擊元素保留
+             ~300ms 的「等等看是不是雙擊縮放」判斷延遲；明確宣告 manipulation 讓瀏覽器跳過這個判斷，
+             點下去立刻觸發，不用等。
+          2. -webkit-tap-highlight-color: transparent — 拿掉 iOS/Android 內建的點擊灰色／藍色
+             閃爍疊層，那層預設高亮本身也有出現與淡出的動畫時間，會讓「點擊」跟「畫面反應」中間
+             多一層視覺延遲感。
+          3. button/[role="button"] 統一補上 active:scale(0.96) 的立即按壓回饋（96ms 線性、不用
+             ease，是所有 transition 裡最快的一種），只要手指按下去的當下就有視覺變化，不必等
+             onClick 真正處理完、狀態更新完、重新 render 完才看到反應——這是「感覺跟手」最關鍵的
+             一步：按壓回饋要在事件處理完成之前、瀏覽器下一幀就先畫出來。
+             選擇器刻意只用最單純的 button:active／[role="button"]:active（不加 .class 或
+             :not()），specificity 壓到最低，這樣個別元件自己那套更具體的 active 動畫
+             （例如上面的 .mode-select-btn:active、premium-range 滑塊的 :active）才會確實蓋掉
+             這裡的預設值，不會被這條全域規則反過來蓋掉。disabled 的按鈕瀏覽器原生就不會觸發
+             :active，所以不需要另外寫 :not(:disabled) 排除。 */}
+      <style>{`
+        button, [role="button"], a, input, select, textarea, summary {
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+        button, [role="button"] {
+          transition: transform 96ms linear;
+        }
+        button:active, [role="button"]:active {
+          transform: scale(0.96);
+        }
+      `}</style>
       {/* 縮放已經改由 index.html 的 viewport meta（initial-scale=0.75, user-scalable=no）
           統一在瀏覽器層級處理，這裡不再另外用 --ui-scale／transform 疊加一層。
           原本在這裡加的那層 JS 動態縮放，是靠 window.innerWidth 判斷裝置寬度決定要不要縮小；
