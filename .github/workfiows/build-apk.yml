@@ -1,10 +1,80 @@
-name: Test Workflow
+name: Build and Release Android APK
+
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Say Hello
-        run: echo "Hello World"
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Install Capacitor
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "時光線" "top.timezzw.app" --web-dir=dist
+          npx cap add android
+
+      - name: Generate app icons
+        run: |
+          mkdir -p resources
+          cp public/icon-512.png resources/icon.png
+          npm install @capacitor/assets --save-dev
+          npx capacitor-assets generate --android
+
+      - name: Sync web assets into Android project
+        run: npx cap sync
+
+      - name: Fix Kotlin stdlib conflict
+        run: |
+          echo '
+          android {
+              configurations.all {
+                  exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
+                  exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
+              }
+          }' >> android/app/build.gradle
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEY_STORE_BASE64 }}" | base64 --decode > android/app/release-key.jks
+
+      - name: Build Release APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
