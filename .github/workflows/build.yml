@@ -29,8 +29,11 @@ jobs:
       - name: Install Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "時光線" "top.timezzw.app" --web-dir=dist
-          npx cap add android
+          # 如果 android 資料夾不存在才初始化並新增，避免重複報錯
+          if [ ! -d "android" ]; then
+            npx cap init "時光線" "top.timezzw.app" --web-dir=dist
+            npx cap add android
+          fi
 
       - name: Generate app icons
         run: |
