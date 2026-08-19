@@ -31,15 +31,35 @@ jobs:
           npm install @capacitor/core @capacitor/cli @capacitor/android
           rm -rf android
           
-          # 直接用程式碼寫死設定檔，避開所有指令參數錯誤
-          echo '{
+          cat << 'EOF' > capacitor.config.json
+          {
             "appId": "top.timezzw.app",
             "appName": "時光線",
             "webDir": "dist",
             "bundledWebRuntime": false
-          }' > capacitor.config.json
+          }
+          EOF
 
           npx cap add android
+
+          cat << 'EOF' >> android/app/build.gradle
+
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("release-key.jks")
+                      storePassword System.getenv("STORE_PASSWORD")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF
 
       - name: Generate app icons
         run: |
@@ -53,13 +73,15 @@ jobs:
 
       - name: Fix Kotlin conflict
         run: |
-          echo '
+          cat << 'EOF' >> android/app/build.gradle
+
           android {
               configurations.all {
                   exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
                   exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
               }
-          }' >> android/app/build.gradle
+          }
+          EOF
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -67,7 +89,6 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-          
       - name: Decode Keystore
         run: |
           echo "${{ secrets.KEY_STORE_BASE64 }}" | base64 --decode > android/app/release-key.jks
