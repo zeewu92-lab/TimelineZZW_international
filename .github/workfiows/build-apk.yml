@@ -3,8 +3,11 @@ name: Build and Release Android APK
 on:
   push:
     tags:
-      - 'v*'  # 当推送 v 开头的 tag 时自动触发，例如 v1.0.11-cn
-  workflow_dispatch:  # 允许在 Actions 页面手动点击运行
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -24,7 +27,7 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Install Capacitor CLI (For syncing)
+      - name: Install Capacitor CLI
         run: npm install @capacitor/cli @capacitor/core
 
       - name: Sync web assets to Android
