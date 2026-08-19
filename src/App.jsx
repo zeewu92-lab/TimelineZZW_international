@@ -417,6 +417,9 @@ const STRINGS = {
     backupImportSuccess: '已還原備份資料。', backupImportError: '備份檔案格式不正確，請確認檔案內容。',
     backupExportSuccess: '已成功存儲備份資料。',
     albumBackupReminder: '「本機備份」可完整保存您上傳的照片及相關數據。為降低數據遺失風險，添加照片後請及時使用「本機備份」保存，並建議另行使用可靠的雲端儲存服務進行備份。',
+    addPhotoHintTitle: '新增相片前的提醒', abandonAdd: '放棄添加', gotItLabel: '我已知悉', gotItLabelCountdown: n => `我已知悉（${n}）`,
+    deleteSelectedAlbumsConfirmTitle: '刪除已選取的相冊？', deleteSelectedAlbumsConfirmDesc: n => `此動作無法復原，確定要刪除已選取的 ${n} 個相冊嗎？相冊內的相片也會一併刪除。`,
+    deleteSelectedPhotosConfirmTitle: '刪除已選取的相片？', deleteSelectedPhotosConfirmDesc: n => `此動作無法復原，確定要刪除已選取的 ${n} 張相片嗎？`,
     backupSlowdownHint: '添加照片後，備份檔案的容量可能增加，「本機備份」的匯入與匯出速度也可能因此變慢，請耐心等待。',
     email: 'Email', password: '密碼', login: '登入', signup: '註冊',
     switchToSignup: '還沒有帳號？註冊', switchToLogin: '已有帳號？登入',
@@ -507,6 +510,9 @@ const STRINGS = {
     backupImportSuccess: 'Backup restored.', backupImportError: 'Invalid backup file. Please check the file and try again.',
     backupExportSuccess: 'Backup saved successfully.',
     albumBackupReminder: '"Local Backup" fully preserves your uploaded photos and related data. To reduce the risk of data loss, please use "Local Backup" promptly after adding photos, and we also recommend backing up separately with a reliable cloud storage service.',
+    addPhotoHintTitle: 'Before you add a photo', abandonAdd: 'Cancel', gotItLabel: 'Got it', gotItLabelCountdown: n => `Got it (${n})`,
+    deleteSelectedAlbumsConfirmTitle: 'Delete the selected albums?', deleteSelectedAlbumsConfirmDesc: n => `This cannot be undone. Delete the ${n} selected album${n === 1 ? '' : 's'}? Photos inside will be deleted too.`,
+    deleteSelectedPhotosConfirmTitle: 'Delete the selected photos?', deleteSelectedPhotosConfirmDesc: n => `This cannot be undone. Delete the ${n} selected photo${n === 1 ? '' : 's'}?`,
     backupSlowdownHint: 'As you add more photos, the backup file size may grow, which can slow down "Local Backup" import and export — please be patient.',
     email: 'Email', password: 'Password', login: 'Log in', signup: 'Sign up',
     switchToSignup: "Don't have an account? Sign up", switchToLogin: 'Already have an account? Log in',
@@ -597,6 +603,9 @@ const STRINGS = {
     backupImportSuccess: 'バックアップを復元しました。', backupImportError: 'バックアップファイルの形式が正しくありません。内容をご確認ください。',
     backupExportSuccess: 'バックアップデータを保存しました。',
     albumBackupReminder: '「ローカルバックアップ」を使うと、アップロードした写真と関連データをまとめて保存できます。データ消失のリスクを減らすため、写真を追加したら早めに「ローカルバックアップ」で保存し、あわせて信頼できるクラウドストレージサービスでも別途バックアップすることをおすすめします。',
+    addPhotoHintTitle: '写真を追加する前に', abandonAdd: '追加をやめる', gotItLabel: '理解しました', gotItLabelCountdown: n => `理解しました（${n}）`,
+    deleteSelectedAlbumsConfirmTitle: '選択したアルバムを削除しますか？', deleteSelectedAlbumsConfirmDesc: n => `この操作は取り消せません。選択した${n}件のアルバムを削除しますか？アルバム内の写真も一緒に削除されます。`,
+    deleteSelectedPhotosConfirmTitle: '選択した写真を削除しますか？', deleteSelectedPhotosConfirmDesc: n => `この操作は取り消せません。選択した${n}枚の写真を削除しますか？`,
     backupSlowdownHint: '写真を追加するとバックアップファイルの容量が大きくなることがあり、「ローカルバックアップ」の書き出し・読み込みが遅くなる場合があります。しばらくお待ちください。',
     email: 'メールアドレス', password: 'パスワード', login: 'ログイン', signup: '新規登録',
     switchToSignup: 'アカウントをお持ちでない方は新規登録', switchToLogin: 'アカウントをお持ちの方はログイン',
@@ -687,6 +696,9 @@ const STRINGS = {
     backupImportSuccess: '백업을 복원했습니다.', backupImportError: '백업 파일 형식이 올바르지 않습니다. 파일 내용을 확인해 주세요.',
     backupExportSuccess: '백업 데이터를 저장했습니다.',
     albumBackupReminder: '"로컬 백업"을 사용하면 업로드한 사진과 관련 데이터를 온전히 저장할 수 있습니다. 데이터 손실 위험을 줄이려면 사진을 추가한 후 바로 "로컬 백업"으로 저장하고, 신뢰할 수 있는 클라우드 저장 서비스로도 별도로 백업하는 것을 권장합니다.',
+    addPhotoHintTitle: '사진을 추가하기 전에', abandonAdd: '추가 취소', gotItLabel: '확인했어요', gotItLabelCountdown: n => `확인했어요（${n}）`,
+    deleteSelectedAlbumsConfirmTitle: '선택한 앨범을 삭제할까요?', deleteSelectedAlbumsConfirmDesc: n => `이 작업은 되돌릴 수 없습니다. 선택한 앨범 ${n}개를 삭제하시겠습니까? 앨범 속 사진도 함께 삭제됩니다.`,
+    deleteSelectedPhotosConfirmTitle: '선택한 사진을 삭제할까요?', deleteSelectedPhotosConfirmDesc: n => `이 작업은 되돌릴 수 없습니다. 선택한 사진 ${n}장을 삭제하시겠습니까?`,
     backupSlowdownHint: '사진을 추가하면 백업 파일 용량이 커질 수 있어 "로컬 백업"의 가져오기/내보내기 속도가 느려질 수 있습니다. 잠시만 기다려 주세요.',
     email: '이메일', password: '비밀번호', login: '로그인', signup: '회원가입',
     switchToSignup: '계정이 없으신가요? 회원가입', switchToLogin: '이미 계정이 있으신가요? 로그인',
@@ -3189,7 +3201,15 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
             {/* 年齡／週年徽章只保留在事件名稱右側，避免詳情卡片重複顯示。 */}
             {/* 開啟循環後，詳情卡片不再額外顯示「每年／每月」頻率文字；循環本身已由模式／事件資訊表達。 */}
             {altCalendarStr && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: accentAlpha('20'), color: ACCENT }}>
+              // 關懷模式的事件：曆法徽章改用事件本身的顏色（呼應「關懷」徽章與圖示色塊），
+              // 不再套用強調色 ACCENT；其餘模式維持原本的 ACCENT 樣式不變。
+              <span
+                className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{
+                  background: ev.isCare ? `${colorHex(ev.colorId)}20` : accentAlpha('20'),
+                  color: ev.isCare ? colorHex(ev.colorId) : ACCENT,
+                }}
+              >
                 {altCalendarStr}
               </span>
             )}
@@ -4552,6 +4572,20 @@ function TimelineSection({
                 「陪伴」「紀念日」目前只記錄選中狀態，具體行為之後再依安排補上。 */}
             <div className="p-3 rounded-xl" style={{ border: CARD_BORDER, background: INPUT_BG }}>
               <div className="text-sm font-bold mb-2" style={{ color: INK }}>{t.modeSelectLabel}</div>
+              {/* 切換動畫：滑動底色的 transform 改用略帶回彈的 cubic-bezier（先小幅過衝再回穩），
+                  比原本純 ease-out 更有「跳」到定位的手感；文字標籤選中時加一個小幅 scale
+                  pop，按下瞬間再用 .mode-select-btn:active 做輕微按壓回饋（inline style 沒辦法
+                  寫 :active，所以額外開一個極小的 <style> 區塊）。下方提示文字改成隨 eventMode
+                  換一次 key，靠 CSS keyframe 做淡入＋輕微上移的 crossfade，取代原本文字瞬間跳換。 */}
+              <style>{`
+                .mode-select-btn { transform: scale(1); transition: color 180ms ease, transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+                .mode-select-btn:active { transform: scale(0.92); }
+                .mode-select-btn.is-active { transform: scale(1.04); }
+                @keyframes modeHintFadeIn {
+                  from { opacity: 0; transform: translateY(-3px); }
+                  to { opacity: 1; transform: translateY(0); }
+                }
+              `}</style>
               <div className="relative flex p-1 rounded-full" style={{ background: '#FFFFFF', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                 <div
                   aria-hidden="true"
@@ -4562,12 +4596,14 @@ function TimelineSection({
                     // --accent 同一個顏色，跟關懷模式其他地方的視覺語言一致），其餘四個
                     // 模式維持原本的 ACCENT。背景色／陰影都加上 transition，切換到／離開
                     // 「關懷」時顏色會平滑地淡入淡出，而不是瞬間跳色。
+                    // transform 改用帶一點回彈的 cubic-bezier，滑動到定位前會先小幅過衝再回穩，
+                    // 手感比單純 ease-out 更自然、更有「跳」過去的流暢感。
                     background: eventMode === 'care' ? '#8B8B92' : ACCENT,
                     boxShadow: eventMode === 'care'
                       ? '0 2px 8px rgba(139,139,146,0.35)'
                       : '0 2px 8px rgba(108,123,224,0.35)',
                     transform: `translateX(${EVENT_MODES.findIndex(m => m.id === eventMode) * 100}%)`,
-                    transition: 'transform 260ms cubic-bezier(0.22, 1, 0.36, 1), background 220ms ease, box-shadow 220ms ease',
+                    transition: 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), background 220ms ease, box-shadow 220ms ease',
                     willChange: 'transform',
                     pointerEvents: 'none',
                   }}
@@ -4577,12 +4613,11 @@ function TimelineSection({
                     key={m.id}
                     type="button"
                     onClick={() => selectMode(m.id)}
-                    className="relative z-10 flex-1 min-w-0 rounded-full text-xs font-bold"
+                    className={'relative z-10 flex-1 min-w-0 rounded-full text-xs font-bold mode-select-btn' + (eventMode === m.id ? ' is-active' : '')}
                     style={{
                       padding: '7px 3px',
                       color: eventMode === m.id ? '#fff' : INK_SOFT,
                       background: 'transparent',
-                      transition: 'color 180ms ease',
                     }}
                   >
                     {t[m.labelKey]}
@@ -4591,7 +4626,9 @@ function TimelineSection({
               </div>
               {(() => {
                 const activeMode = EVENT_MODES.find(m => m.id === eventMode);
-                return activeMode ? <p className="text-xs mt-2" style={{ color: INK_SOFT }}>{t[activeMode.hintKey]}</p> : null;
+                return activeMode ? (
+                  <p key={eventMode} className="text-xs mt-2" style={{ color: INK_SOFT, animation: 'modeHintFadeIn 220ms ease' }}>{t[activeMode.hintKey]}</p>
+                ) : null;
               })()}
             </div>
 
@@ -4866,6 +4903,65 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
+  // 「新增相片」提醒視窗：改由原本固定顯示在視窗底部的一行小字（albumBackupReminder），
+  // 改成使用者點「新增相片」時才彈出的視窗，看完並倒數 6 秒後按「我已知悉」才能繼續選檔案；
+  // 按過一次之後（寫進 window.storage 的 ALBUM_ADD_HINT_ACKED_KEY）永久不再彈出。
+  // hintAcked 用 null 代表「還沒讀取到目前狀態」，避免第一次讀取完成前誤判成「還沒看過」而多彈一次。
+  const [hintAcked, setHintAcked] = useState(null);
+  const [showAddHintModal, setShowAddHintModal] = useState(false);
+  const [addHintCountdown, setAddHintCountdown] = useState(6);
+  const ADD_HINT_COUNTDOWN_SECONDS = 6;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let acked = false;
+      try {
+        const res = await window.storage.get(ALBUM_ADD_HINT_ACKED_KEY, false);
+        acked = !!(res && res.value === 'true');
+      } catch (err) {
+        // 還沒存過視為沒看過，屬於正常情況
+      }
+      if (!cancelled) setHintAcked(acked);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 提醒視窗開著時才跑倒數，每秒遞減一次；關閉視窗或倒數歸零就停止。
+  useEffect(() => {
+    if (!showAddHintModal || addHintCountdown <= 0) return;
+    const timer = setTimeout(() => setAddHintCountdown(s => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [showAddHintModal, addHintCountdown]);
+
+  // 點「新增相片」：還沒按過「我已知悉」就先彈提醒視窗，按過的話直接開檔案選擇窗，跟原本行為一致。
+  function handleAddPhotoClick() {
+    if (hintAcked) {
+      fileInputRef.current && fileInputRef.current.click();
+      return;
+    }
+    setAddHintCountdown(ADD_HINT_COUNTDOWN_SECONDS);
+    setShowAddHintModal(true);
+  }
+  // 「放棄添加」：關掉提醒視窗，不記住已讀狀態、也不開檔案選擇窗——下次點「新增相片」還是會再彈一次。
+  function abandonAddPhoto() {
+    setShowAddHintModal(false);
+  }
+  // 「我已知悉」：倒數結束才可點擊。記住已讀狀態（之後不再彈出），關閉提醒視窗，
+  // 並直接接著開檔案選擇窗，讓使用者不用再點一次「新增相片」。
+  function acknowledgeAddHint() {
+    if (addHintCountdown > 0) return;
+    setHintAcked(true);
+    window.storage.set(ALBUM_ADD_HINT_ACKED_KEY, 'true', false).catch(() => {});
+    setShowAddHintModal(false);
+    fileInputRef.current && fileInputRef.current.click();
+  }
+
+  // 相冊／相片批量刪除前的二次確認：比照「刪除地標」同一套彈窗風格，記錄的是「要不要顯示確認視窗」，
+  // 實際刪除動作要等使用者在確認視窗裡按下「確認刪除」才會真的執行。
+  const [showDeleteAlbumsConfirm, setShowDeleteAlbumsConfirm] = useState(false);
+  const [showDeletePhotosConfirm, setShowDeletePhotosConfirm] = useState(false);
+
   // 相冊批量管理（長按某個相冊名稱觸發）
   const [albumSelectMode, setAlbumSelectMode] = useState(false);
   const [selectedAlbumIds, setSelectedAlbumIds] = useState([]);
@@ -4961,8 +5057,15 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
     setSelectedAlbumIds([]);
     setAlbumRenameDraft(null);
   }
-  function confirmDeleteSelectedAlbums() {
+  // 點工具列的刪除鈕：先彈二次確認視窗，不直接刪除
+  function requestDeleteSelectedAlbums() {
+    if (!selectedAlbumIds.length) return;
+    setShowDeleteAlbumsConfirm(true);
+  }
+  // 確認視窗裡按下「確認刪除」才真正執行
+  function performDeleteSelectedAlbums() {
     const idsToDelete = selectedAlbumIds;
+    setShowDeleteAlbumsConfirm(false);
     if (!idsToDelete.length) return;
     onUpdateAlbums(prev => prev.filter(a => !idsToDelete.includes(a.id)));
     // 相冊骨架刪掉的同時，把對應的相片 storage key 也清掉，不留孤兒資料
@@ -5031,7 +5134,14 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
     setSelectedPhotoIds([]);
     setShowMoveMenu(false);
   }
-  function confirmDeleteSelectedPhotos() {
+  // 點工具列的刪除鈕：先彈二次確認視窗，不直接刪除
+  function requestDeleteSelectedPhotos() {
+    if (!selectedAlbumId || !selectedPhotoIds.length) return;
+    setShowDeletePhotosConfirm(true);
+  }
+  // 確認視窗裡按下「確認刪除」才真正執行
+  function performDeleteSelectedPhotos() {
+    setShowDeletePhotosConfirm(false);
     if (!selectedAlbumId || !selectedPhotoIds.length) return;
     mutateAlbumPhotos(selectedAlbumId, current => current.filter(p => !selectedPhotoIds.includes(p.id)));
     cancelPhotoSelect();
@@ -5135,7 +5245,7 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
                   <button onClick={startRenameSelectedAlbum} aria-label={t.renameAlbum} title={t.renameAlbum} className="p-1.5 rounded-lg" style={{ color: INK }}><Pencil size={14} /></button>
                 )}
                 <button
-                  onClick={confirmDeleteSelectedAlbums}
+                  onClick={requestDeleteSelectedAlbums}
                   disabled={!selectedAlbumIds.length}
                   className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium flex-shrink-0"
                   style={{ background: DANGER, color: '#fff', opacity: selectedAlbumIds.length ? 1 : 0.4 }}
@@ -5171,7 +5281,7 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
                   </div>
                 )}
                 <button
-                  onClick={confirmDeleteSelectedPhotos}
+                  onClick={requestDeleteSelectedPhotos}
                   disabled={!selectedPhotoIds.length}
                   className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium flex-shrink-0"
                   style={{ background: DANGER, color: '#fff', opacity: selectedPhotoIds.length ? 1 : 0.4 }}
@@ -5252,7 +5362,7 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
             <div className="grid grid-cols-3 gap-2">
               {!photoSelectMode && !albumSelectMode && selectedAlbumId && (
                 <button
-                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                  onClick={handleAddPhotoClick}
                   disabled={uploading}
                   aria-label={t.addPhoto}
                   title={t.addPhoto}
@@ -5283,11 +5393,6 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
             <p className="text-xs text-center mt-3" style={{ color: INK_SOFT }}>{t.noPhotosYet}</p>
           )}
         </div>
-
-        {/* 相片遺失風險提醒：提醒使用者「本機備份」能完整保存相片與相關資料，
-            建議添加相片後及時使用「本機備份」保存，並另行搭配可靠的雲端儲存服務備份。
-            固定放在視窗最下方，批量管理模式（albumSelectMode／photoSelectMode）時也照常顯示。 */}
-        <p className="text-[11px] leading-snug flex-shrink-0" style={{ color: INK_SOFT }}>{t.albumBackupReminder}</p>
 
         <input
           ref={fileInputRef}
@@ -5339,6 +5444,131 @@ function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAl
               <ChevronRight size={30} />
             </button>
           )}
+        </div>,
+        document.body
+      )}
+
+      {/* 「新增相片」提醒視窗：點「新增相片」時彈出（見 handleAddPhotoClick），內容沿用原本固定顯示
+          在視窗底部的那段備份提醒文字。「我已知悉」按鈕要等 6 秒倒數結束才能點——倒數期間顯示
+          剩餘秒數、按鈕呈現半透明的停用樣式；按下後記住已讀狀態（ALBUM_ADD_HINT_ACKED_KEY），
+          之後點「新增相片」就不會再看到這個視窗，並直接接著開檔案選擇窗。「放棄添加」或點背景
+          則單純關掉視窗，不記住已讀、也不開檔案選擇窗，下次點「新增相片」還是會再看到一次。
+          視覺風格跟下面兩個批量刪除確認視窗、以及「刪除地標」確認視窗統一：置中彈窗＋毛玻璃卡片。 */}
+      {showAddHintModal && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
+          onClick={abandonAddPhoto}
+        >
+          <div
+            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
+            style={{ ...AUTH_GLASS }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-black" style={{ color: INK }}>{t.addPhotoHintTitle}</h2>
+            <p className="text-sm" style={{ color: INK }}>{t.albumBackupReminder}</p>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={abandonAddPhoto}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid var(--card-border)`, color: INK_SOFT }}
+              >
+                {t.abandonAdd}
+              </button>
+              <button
+                onClick={acknowledgeAddHint}
+                disabled={addHintCountdown > 0}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{
+                  background: ACCENT,
+                  color: '#fff',
+                  opacity: addHintCountdown > 0 ? 0.55 : 1,
+                  cursor: addHintCountdown > 0 ? 'not-allowed' : 'pointer',
+                  transition: 'opacity 180ms ease',
+                }}
+              >
+                {addHintCountdown > 0 ? t.gotItLabelCountdown(addHintCountdown) : t.gotItLabel}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 批量刪除相冊前的二次確認：點工具列的刪除鈕（requestDeleteSelectedAlbums）先彈這個視窗，
+          按「確認刪除」才會真的執行（performDeleteSelectedAlbums），風格跟「刪除地標」確認視窗
+          完全一致（置中彈窗、AUTH_GLASS 毛玻璃卡片、標題 DANGER 紅色、按鈕左白右紅並排）。 */}
+      {showDeleteAlbumsConfirm && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setShowDeleteAlbumsConfirm(false)}
+        >
+          <div
+            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
+            style={{ ...AUTH_GLASS }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteSelectedAlbumsConfirmTitle}</h2>
+              <button onClick={() => setShowDeleteAlbumsConfirm(false)} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+            </div>
+            <p className="text-sm" style={{ color: INK }}>{t.deleteSelectedAlbumsConfirmDesc(selectedAlbumIds.length)}</p>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={performDeleteSelectedAlbums}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}
+              >
+                {t.confirmDeleteLandmark}
+              </button>
+              <button
+                onClick={() => setShowDeleteAlbumsConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: DANGER, color: '#fff' }}
+              >
+                {t.cancelDeleteLandmark}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 批量刪除相片前的二次確認：同上，對象換成目前多選的相片。 */}
+      {showDeletePhotosConfirm && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setShowDeletePhotosConfirm(false)}
+        >
+          <div
+            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
+            style={{ ...AUTH_GLASS }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteSelectedPhotosConfirmTitle}</h2>
+              <button onClick={() => setShowDeletePhotosConfirm(false)} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+            </div>
+            <p className="text-sm" style={{ color: INK }}>{t.deleteSelectedPhotosConfirmDesc(selectedPhotoIds.length)}</p>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={performDeleteSelectedPhotos}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}
+              >
+                {t.confirmDeleteLandmark}
+              </button>
+              <button
+                onClick={() => setShowDeletePhotosConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: DANGER, color: '#fff' }}
+              >
+                {t.cancelDeleteLandmark}
+              </button>
+            </div>
+          </div>
         </div>,
         document.body
       )}
@@ -6200,6 +6430,10 @@ const NOTIFY_LOG_KEY = 'event-notify-log';
 // 相冊相片本體另外存放的 key 前綴：album-photos:{albumId}，跟事件骨架（EVENTS_KEY）分開存，
 // 詳細原因見 AlbumModal 開頭的註解——避免相片跟其他所有資料擠在同一個 key 裡導致整包存失敗。
 const ALBUM_PHOTOS_PREFIX = 'album-photos:';
+// 「新增相片」提醒視窗是否已被使用者按過「我已知悉」——按過之後永久不再彈出（跨相冊、跨事件、
+// 重新整理後都記得），所以獨立存一個 key，交由 AlbumModal 自己讀寫，不用經過 App 上層的
+// events/clocks 那一整套載入流程。
+const ALBUM_ADD_HINT_ACKED_KEY = 'album-add-photo-hint-acked';
 
 // 自我修復用的搬遷函式：早期版本可能把相片直接內嵌在 ev.albums[].photos 裡（跟事件骨架擠在同一個
 // window.storage key），一旦累積夠多相片就會整包超過單一 key 的大小上限、悄悄存失敗。這裡偵測到
