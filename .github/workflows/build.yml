@@ -29,8 +29,10 @@ jobs:
       - name: Clean and Recreate Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          # 強制刪除舊的有缺損的 android 資料夾，確保從零乾淨生成包含 gradlew 的完整專案
           rm -rf android
+          # 先自動初始化設定檔，補上 App 名稱與 ID
+          npx cap init "時光線" "top.timezzw.app" --web-dir=dist --yes
+          # 接著再安全地加入 android 平台
           npx cap add android
 
       - name: Generate app icons
