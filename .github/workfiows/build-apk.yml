@@ -69,8 +69,8 @@ jobs:
           ./gradlew assembleRelease
         env:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASS }}      # 已對應你截圖中的 KEY_PASS
-          STORE_PASSWORD: ${{ secrets.STORE_PASS }}   # 已對應你截圖中的 STORE_PASS
+          KEY_PASSWORD: ${{ secrets.KEY_PASS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASS }}
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
