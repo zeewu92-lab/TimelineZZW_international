@@ -1,9 +1,8 @@
 name: Build and Release Android APK
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]  # 在網頁端點擊 Publish release 觸發
   workflow_dispatch:
 
 permissions:
