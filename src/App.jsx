@@ -7037,6 +7037,10 @@ export default function App() {
   }, [fileHandlerMsg]);
   // 頁面底色改放到 <body> 上（而非包在最外層 div），這樣「置底」的測試版水印（負 z-index）
   // 才能疊在 body 底色之上、又被 App 內容蓋住其不透明的部分，達到「鋪在最底層」的效果。
+  // transition 只設定一次(不放進 isDark 的 effect 裡,避免每次切換都重複指定同一個屬性),
+  // 之後每次 isDark 改變、background 值變動時,瀏覽器就會自動用這個 transition 淡入淡出,
+  // 取代原本瞬間切換的生硬感。只影響 body 底色本身,不會波及其他元件各自獨立的背景設定。
+  useEffect(() => { document.body.style.transition = 'background 450ms ease'; }, []);
   useEffect(() => { document.body.style.background = isDark ? '#121419' : '#FFFFFF'; }, [isDark]);
 
   // App(Capacitor 原生環境)裡想要比網頁版更寬鬆一點的密度，改用調整根字級（rem 縮放）達成。
