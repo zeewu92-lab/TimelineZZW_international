@@ -7048,16 +7048,22 @@ export default function App() {
   useEffect(() => { document.body.style.transition = 'background 450ms ease'; }, []);
   useEffect(() => { document.body.style.background = isDark ? '#121419' : '#FFFFFF'; }, [isDark]);
 
-  // App(Capacitor 原生環境)裡想要比網頁版更寬鬆一點的密度，改用調整根字級（rem 縮放）達成。
-  // Tailwind 的 padding／gap／字級絕大多數都是 rem 為單位，改根字級會讓整體排版等比例縮小，
-  // 效果接近原本想用 viewport 縮放做的事，但完全在一般 CSS 佈局層級運作：
-  // 不會二次干擾 viewport meta 的縮放、不會動到 window.innerWidth 的量測結果、
-  // position:fixed 元件的定位也完全不受影響——避免了先前縮放疊加導致的「底部裁切」問題。
-  // 只在 App 環境套用；網頁版／PWA 完全不受影響，維持原本字級。
-  // 87.5% 是起始值，想再寬鬆一點就調小百分比、想再緊湊一點就調大。
+  // 曾經在這裡用調整根字級（rem 縮放）模擬「更寬鬆密度」的效果，但實測發現這會跟其他用
+  // 寫死 px 值定位的元件（例如時間軸圓點指示器的 left: -25，是針對「不縮放」的排版校準
+  // 出來的數字）互相打架，導致圓點跟軸線對不齊。比對實際效果後確認：不縮放（保持根字級
+  // 100%）才是想要的樣子，所以這裡不再做任何縮放。
+
+  // 修正 App 頂部跟手機狀態列（時間、電量那排）重疊的問題。Capacitor 預設在較新版本會讓
+  // WebView 畫面延伸到狀態列底下（edge-to-edge），需要用 @capacitor/status-bar 外掛明確
+  // 告訴系統「畫面內容不要疊在狀態列下面」，系統會自動把整個 WebView 往下推、空出狀態列
+  // 的高度，不用自己算 safe-area 的 px 值去湊 padding，跨機型也比較不會有誤差。
+  // 只在 App 環境套用；網頁版不受影響。
   useEffect(() => {
     if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-      document.documentElement.style.fontSize = '75%';
+      const StatusBar = window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar;
+      if (StatusBar && StatusBar.setOverlaysWebView) {
+        StatusBar.setOverlaysWebView({ overlay: false });
+      }
     }
   }, []);
 
