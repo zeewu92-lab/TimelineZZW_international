@@ -43,7 +43,7 @@ jobs:
           # 只在 App(Capacitor)環境套用 CSS zoom,還原原本用 initial-scale=0.75 想要的寬鬆密度感
           # 網頁版/PWA 不受影響,因為 window.Capacitor 只存在於 App 環境
           # 針對 #root 而非整個 html 套用,並用 min-height 補償縮放比例,避免底部出現空白遮擋
-          sed -i 's#</head>#    <style>html.cap-zoom #root { zoom: 0.82; min-height: calc(100dvh / 0.82); }</style>\n    <script>if (window.Capacitor \&\& window.Capacitor.isNativePlatform \&\& window.Capacitor.isNativePlatform()) { document.documentElement.classList.add("cap-zoom"); }</script>\n  </head>#' dist/index.html
+          sed -i 's|</head>|    <style>html.cap-zoom #root { zoom: 0.82; min-height: calc(100dvh / 0.82); }</style>\n    <script>if (window.Capacitor \&\& window.Capacitor.isNativePlatform \&\& window.Capacitor.isNativePlatform()) { document.documentElement.classList.add("cap-zoom"); }</script>\n  </head>|' dist/index.html
 
       - name: Clean and Recreate Android Platform
         run: |
