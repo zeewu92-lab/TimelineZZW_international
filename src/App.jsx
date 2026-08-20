@@ -7048,7 +7048,7 @@ export default function App() {
   // 87.5% 是起始值，想再寬鬆一點就調小百分比、想再緊湊一點就調大。
   useEffect(() => {
     if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-      document.documentElement.style.fontSize = '87.5%';
+      document.documentElement.style.fontSize = '75%';
     }
   }, []);
 
