@@ -34,16 +34,15 @@ jobs:
 
       - name: Fix mobile viewport scaling
         run: |
+          # Android WebView 對 initial-scale<1 支援不穩定,會導致內容爆版放大,
+          # 所以強制改成 1.0。App 本身的排版邏輯已經是「單層縮放交給 viewport meta
+          # 統一處理」的設計(見 App.jsx 內部說明),這裡絕對不能再疊加任何額外的
+          # zoom/transform/JS 動態縮放,否則會重現「底部裁切」「置中留白」的雙層縮放衝突。
           if grep -q '<meta name="viewport"' dist/index.html; then
             sed -i 's#<meta name="viewport"[^>]*>#<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">#' dist/index.html
           else
             sed -i 's#<head>#<head>\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">#' dist/index.html
           fi
-
-          # 只在 App(Capacitor)環境套用 CSS zoom,還原原本用 initial-scale=0.75 想要的寬鬆密度感
-          # 網頁版/PWA 不受影響,因為 window.Capacitor 只存在於 App 環境
-          # 針對 #root 而非整個 html 套用,並用 min-height 補償縮放比例,避免底部出現空白遮擋
-          sed -i 's|</head>|    <style>html.cap-zoom #root { zoom: 0.82; min-height: calc(100dvh / 0.82); }</style>\n    <script>if (window.Capacitor \&\& window.Capacitor.isNativePlatform \&\& window.Capacitor.isNativePlatform()) { document.documentElement.classList.add("cap-zoom"); }</script>\n  </head>|' dist/index.html
 
       - name: Clean and Recreate Android Platform
         run: |
@@ -89,7 +88,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y imagemagick
           mkdir -p resources
           if [ -f public/icon-512.png ]; then
-            convert public/icon-512.png -resize 90% -gravity center -background none -extent 512x512 resources/icon.png
+            convert public/icon-512.png -resize 96% -gravity center -background none -extent 512x512 resources/icon.png
           else
             echo "Icon not found, skipping."
           fi
