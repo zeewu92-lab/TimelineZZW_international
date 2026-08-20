@@ -61,6 +61,9 @@ export default async function handler(req) {
   const form = await req.formData();
   const message = form.get('message');
   const contact = form.get('contact');
+  // 前端「意見類型」二級選單選填欄位；沒選時 form.get 會是 null，caption 組字串時直接跳過，
+  // 不影響原本「只填意見內容也能送出」的行為。
+  const feedbackType = form.get('feedbackType');
   // 前端用同一個欄位名 'images' 重複 append 多張圖，這裡用 getAll 收成陣列；
   // 過濾掉空檔案（例如選取後又被使用者清空的情況）。
   const images = form.getAll('images').filter(f => f && typeof f === 'object' && f.size > 0);
@@ -69,7 +72,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid message' }), { status: 400 });
   }
 
-  const caption = `📩 新意見反饋\n\n${message}${contact ? `\n\n聯絡方式：${contact}` : ''}`;
+  const caption = `📩 新意見反饋${feedbackType ? `（${feedbackType}）` : ''}\n\n${message}${contact ? `\n\n聯絡方式：${contact}` : ''}`;
 
   try {
     if (images.length === 0) {
