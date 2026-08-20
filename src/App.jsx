@@ -7039,6 +7039,19 @@ export default function App() {
   // 才能疊在 body 底色之上、又被 App 內容蓋住其不透明的部分，達到「鋪在最底層」的效果。
   useEffect(() => { document.body.style.background = isDark ? '#121419' : '#FFFFFF'; }, [isDark]);
 
+  // App(Capacitor 原生環境)裡想要比網頁版更寬鬆一點的密度，改用調整根字級（rem 縮放）達成。
+  // Tailwind 的 padding／gap／字級絕大多數都是 rem 為單位，改根字級會讓整體排版等比例縮小，
+  // 效果接近原本想用 viewport 縮放做的事，但完全在一般 CSS 佈局層級運作：
+  // 不會二次干擾 viewport meta 的縮放、不會動到 window.innerWidth 的量測結果、
+  // position:fixed 元件的定位也完全不受影響——避免了先前縮放疊加導致的「底部裁切」問題。
+  // 只在 App 環境套用；網頁版／PWA 完全不受影響，維持原本字級。
+  // 87.5% 是起始值，想再寬鬆一點就調小百分比、想再緊湊一點就調大。
+  useEffect(() => {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      document.documentElement.style.fontSize = '87.5%';
+    }
+  }, []);
+
   const t = STRINGS[lang];
   const now = nowTick;
   const todayStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { month: 'long', day: 'numeric', weekday: 'long' }).format(now);
