@@ -16,6 +16,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ github.event.inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +31,14 @@ jobs:
 
       - name: Build web app
         run: npm run build
+
+      - name: Fix mobile viewport scaling
+        run: |
+          if grep -q '<meta name="viewport"' dist/index.html; then
+            sed -i 's#<meta name="viewport"[^>]*>#<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">#' dist/index.html
+          else
+            sed -i 's#<head>#<head>\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">#' dist/index.html
+          fi
 
       - name: Clean and Recreate Android Platform
         run: |
@@ -45,6 +55,10 @@ jobs:
           EOF
 
           npx cap add android
+
+          VERSION_NAME=$(echo "$APP_VERSION" | sed 's/^v//')
+          sed -i "s/versionCode 1/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"$VERSION_NAME\"/" android/app/build.gradle
 
           cat << 'EOF' >> android/app/build.gradle
 
@@ -67,8 +81,13 @@ jobs:
 
       - name: Generate app icons
         run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick
           mkdir -p resources
-          cp public/icon-512.png resources/icon.png || echo "Icon not found, skipping."
+          if [ -f public/icon-512.png ]; then
+            convert public/icon-512.png -resize 66% -gravity center -background none -extent 512x512 resources/icon.png
+          else
+            echo "Icon not found, skipping."
+          fi
           npm install @capacitor/assets --save-dev
           npx capacitor-assets generate --android
 
