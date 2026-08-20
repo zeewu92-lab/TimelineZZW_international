@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本號 (例如 v1.0.27),務必是從未用過的新版號'
+        required: true
 
 permissions:
   contents: write
@@ -118,6 +122,7 @@ jobs:
       - name: Upload to Release (as draft)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
           files: android/app/build/outputs/apk/release/app-release.apk
           draft: true
         env:
