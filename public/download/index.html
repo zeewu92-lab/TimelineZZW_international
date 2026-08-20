@@ -18,6 +18,35 @@
     --input-bg: #232733;
     --page-bg: #121419;
     --accent: #6C7BE0;
+    --shadow-card: 0 20px 60px rgba(0,0,0,0.45), 0 2px 10px rgba(0,0,0,0.3);
+    --shadow-icon: 0 12px 30px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    --shadow-modal: 0 24px 70px rgba(0,0,0,0.55), 0 2px 10px rgba(0,0,0,0.3);
+    --bg-glow:
+      radial-gradient(circle at 22% 18%, rgba(255,209,140,0.10), transparent 40%),
+      radial-gradient(circle at 78% 72%, rgba(108,123,224,0.16), transparent 45%),
+      radial-gradient(circle at 50% 100%, rgba(108,123,224,0.10), transparent 50%);
+    --star-noise-opacity: 0.5;
+  }
+
+  /* 跟隨系統淺色模式：覆蓋成白色主題的色票與陰影，版面結構完全不變。 */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ink: #232733;
+      --ink-soft: rgba(35,39,51,0.55);
+      --card-bg: #FFFFFF;
+      --card-border: #E7E8ED;
+      --input-bg: #F4F5F8;
+      --page-bg: #EEF0F4;
+      --accent: #6C7BE0;
+      --shadow-card: 0 20px 50px rgba(35,39,51,0.10), 0 2px 8px rgba(35,39,51,0.06);
+      --shadow-icon: 0 10px 24px rgba(35,39,51,0.16), 0 0 0 1px rgba(35,39,51,0.03);
+      --shadow-modal: 0 24px 60px rgba(35,39,51,0.18), 0 2px 10px rgba(35,39,51,0.08);
+      --bg-glow:
+        radial-gradient(circle at 20% 15%, rgba(255,204,120,0.16), transparent 42%),
+        radial-gradient(circle at 82% 78%, rgba(108,123,224,0.14), transparent 48%),
+        radial-gradient(circle at 50% 100%, rgba(108,123,224,0.08), transparent 55%);
+      --star-noise-opacity: 0; /* 星點雜訊只在深色背景看得出來，淺色模式關掉 */
+    }
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -39,21 +68,18 @@
     padding: 32px 20px;
     position: relative;
     overflow-x: hidden;
-    /* 呼應圖示的深夜星空感：底色深藍 + 兩處柔光暈染，疊上一層極細的雜訊點模擬星塵 */
-    background-image:
-      radial-gradient(circle at 22% 18%, rgba(255,209,140,0.10), transparent 40%),
-      radial-gradient(circle at 78% 72%, rgba(108,123,224,0.16), transparent 45%),
-      radial-gradient(circle at 50% 100%, rgba(108,123,224,0.10), transparent 50%);
+    /* 呼應圖示的深夜星空感（深色模式）／柔和暖光＋淡紫暈染（淺色模式）：由 --bg-glow 依系統色彩模式切換 */
+    background-image: var(--bg-glow);
     background-color: var(--page-bg);
   }
 
-  /* 極細星點雜訊層，疊加在背景漸層之上，不影響版面互動 */
+  /* 極細星點雜訊層，疊加在背景漸層之上，不影響版面互動；淺色模式下由 --star-noise-opacity 關閉 */
   body::before {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
-    opacity: 0.5;
+    opacity: var(--star-noise-opacity);
     background-image:
       radial-gradient(1px 1px at 12% 24%, rgba(255,255,255,0.5), transparent 100%),
       radial-gradient(1px 1px at 32% 62%, rgba(255,255,255,0.35), transparent 100%),
@@ -73,8 +99,8 @@
     background: var(--card-bg);
     border: 1px solid var(--card-border);
     border-radius: 32px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.45), 0 2px 10px rgba(0,0,0,0.3);
-    padding: 40px 28px 32px;
+    box-shadow: var(--shadow-card);
+    padding: 40px 28px 46px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -85,7 +111,7 @@
     width: 112px;
     height: 112px;
     border-radius: 26px;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    box-shadow: var(--shadow-icon);
     margin-bottom: 20px;
   }
 
@@ -164,8 +190,11 @@
   }
 
   .version {
+    position: absolute;
+    right: 22px;
+    bottom: 16px;
     font-family: 'Quicksand', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--ink-soft);
     letter-spacing: 0.03em;
@@ -178,7 +207,8 @@
     padding-top: 18px;
   }
 
-  .apple-toggle summary {
+  .apple-toggle-btn {
+    width: 100%;
     list-style: none;
     cursor: pointer;
     display: flex;
@@ -187,29 +217,25 @@
     gap: 6px;
     font-size: 13px;
     font-weight: 700;
+    font-family: inherit;
     color: var(--ink-soft);
     padding: 4px 0;
+    background: none;
+    border: none;
     transition: color 0.2s ease;
   }
-  .apple-toggle summary::-webkit-details-marker { display: none; }
-  .apple-toggle summary:active { color: var(--ink); }
+  .apple-toggle-btn:active { color: var(--ink); }
+  .apple-toggle-btn svg.apple-icon { flex-shrink: 0; }
+  .apple-toggle-btn .chevron { flex-shrink: 0; transform: rotate(-90deg); }
 
-  .apple-toggle summary svg.apple-icon { flex-shrink: 0; }
-
-  .apple-toggle summary .chevron {
-    flex-shrink: 0;
-    transition: transform 0.25s ease;
-  }
-  .apple-toggle[open] summary .chevron { transform: rotate(180deg); }
-
-  .apple-toggle .apple-answer {
-    margin: 12px 0 0;
+  .apple-answer {
+    margin: 0;
     font-size: 12px;
     line-height: 1.7;
     color: var(--ink-soft);
-    animation: fadeSlideIn 0.25s ease;
+    text-align: left;
   }
-  .apple-toggle .apple-answer + .apple-answer {
+  .apple-answer + .apple-answer {
     margin-top: 10px;
   }
 
@@ -219,7 +245,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 18px;
     padding: 13px 20px;
     border-radius: 14px;
     font-size: 14px;
@@ -231,19 +257,79 @@
     text-decoration: none;
     cursor: pointer;
     transition: opacity 0.2s ease, border-color 0.2s ease;
-    animation: fadeSlideIn 0.25s ease;
   }
   .safari-btn:active { opacity: 0.8; }
   .safari-btn svg { flex-shrink: 0; }
 
-  @keyframes fadeSlideIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+  /* Apple 使用者說明彈窗：覆蓋在主卡片上層的獨立視窗，半透明黑底遮罩 + 置中卡片，
+     用 opacity + transform 做淡入淡出，關閉時维持在 DOM 裡但 pointer-events:none 避免誤觸。 */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(6,7,10,0.62);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .modal-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-card {
+    position: relative;
+    width: 100%;
+    max-width: 340px;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 28px;
+    padding: 30px 24px 26px;
+    box-shadow: var(--shadow-modal);
+    transform: translateY(14px) scale(0.97);
+    transition: transform 0.25s ease;
+  }
+  .modal-overlay.open .modal-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--input-bg);
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.2s ease;
+  }
+  .modal-close:active { opacity: 0.75; }
+
+  .modal-title {
+    margin: 0 0 16px;
+    padding-right: 26px;
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--ink);
+    text-align: left;
   }
 </style>
 </head>
 <body>
-  
+
   <div class="card">
     <img class="icon" src="icon-512.png" alt="時光線 App 圖示">
     <h1 class="app-name">時光線</h1>
@@ -253,19 +339,33 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.341a1.09 1.09 0 1 1 0-2.18 1.09 1.09 0 0 1 0 2.18Zm-11.046 0a1.09 1.09 0 1 1 0-2.18 1.09 1.09 0 0 1 0 2.18Zm11.404-6.02.002-.006 2.02-3.5a.416.416 0 0 0-.152-.567.416.416 0 0 0-.567.152l-2.046 3.543a11.86 11.86 0 0 0-9.276 0L5.816 5.4a.416.416 0 0 0-.567-.152.416.416 0 0 0-.152.567l2.02 3.5.002.006C3.94 11.166 1.756 14.407 1.5 18.2h21c-.256-3.793-2.44-7.034-5.619-8.879Z"/></svg>
       Android APK
     </div>
-    
+
     <a href="https://github.com/zeewu92-lab/sgx.tzzwnb/releases/download/untagged-ad0c7697831f53596111/app-release.apk" class="download-btn is-live" download>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       立即下載
     </a>
     <p class="note">「時光線」由個人開發維護，程式本身無病毒等已知安全風險。因尚未經應用程式商店審核，部分裝置可能發生安全提醒，請確認來源為官方後放心下載。</p>
 
-      <details class="apple-toggle">
-      <summary>
-        <svg class="apple-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.11.55-2.2 1.19-2.98.75-.94 2.05-1.65 3.12-1.68.02.13.04.28.04.4zm4.565 15.71c-.03.07-.463 1.582-1.535 3.128-.94 1.365-1.9 2.752-3.43 2.78-1.502.028-1.985-.9-3.7-.9-1.716 0-2.253.868-3.678.928-1.474.06-2.6-1.478-3.55-2.837-1.933-2.79-3.41-7.885-1.427-11.31.982-1.7 2.738-2.78 4.646-2.81 1.443-.028 2.805.972 3.688.972.882 0 2.53-1.202 4.266-1.026.727.03 2.766.294 4.076 2.213-.105.066-2.434 1.42-2.406 4.24.03 3.37 2.96 4.494 2.994 4.51z"/></svg>
-        <span>您是 Apple 使用者？</span>
-        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </summary>
+      <div class="apple-toggle">
+        <button type="button" id="appleModalOpenBtn" class="apple-toggle-btn">
+          <svg class="apple-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.11.55-2.2 1.19-2.98.75-.94 2.05-1.65 3.12-1.68.02.13.04.28.04.4zm4.565 15.71c-.03.07-.463 1.582-1.535 3.128-.94 1.365-1.9 2.752-3.43 2.78-1.502.028-1.985-.9-3.7-.9-1.716 0-2.253.868-3.678.928-1.474.06-2.6-1.478-3.55-2.837-1.933-2.79-3.41-7.885-1.427-11.31.982-1.7 2.738-2.78 4.646-2.81 1.443-.028 2.805.972 3.688.972.882 0 2.53-1.202 4.266-1.026.727.03 2.766.294 4.076 2.213-.105.066-2.434 1.42-2.406 4.24.03 3.37 2.96 4.494 2.994 4.51z"/></svg>
+          <span>您是 Apple 使用者？</span>
+          <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+        </button>
+      </div>
+
+      <span class="version">＠zhaoziwuOfficial</span>
+  </div>
+
+  <!-- Apple 使用者說明彈窗：預設隱藏（沒有 open class），點擊上面按鈕才顯示，
+       覆蓋在主卡片最上層，點遮罩空白處或右上角關閉鈕都可以收起。 -->
+  <div class="modal-overlay" id="appleModalOverlay">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="appleModalTitle">
+      <button type="button" class="modal-close" id="appleModalCloseBtn" aria-label="關閉">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+      <h2 id="appleModalTitle" class="modal-title">對於 Apple 使用者</h2>
+
       <p class="apple-answer">「時光線」目前尚未在 App Store 上架。Apple 使用者請使用 Safari 瀏覽器開啟 👉timezzw.top，並「加入主畫面」進行體驗。</p>
       <p class="apple-answer">加入主畫面後，無須手動下載或更新。每次重新整理網頁，即可使用最新版本。</p>
 
@@ -276,11 +376,36 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9.4"/><path d="M15.5 8.5 12.9 12.9 8.5 15.5l2.6-4.4Z" fill="currentColor" stroke-linejoin="round"/></svg>
         一鍵在 Safari 開啟
       </a>
-    </details>
+    </div>
   </div>
 
   
   <script>
+    (function () {
+      // Apple 使用者說明彈窗：開/關 + 點遮罩空白處關閉 + Esc 鍵關閉。
+      var openBtn = document.getElementById('appleModalOpenBtn');
+      var overlay = document.getElementById('appleModalOverlay');
+      var closeBtn = document.getElementById('appleModalCloseBtn');
+      if (openBtn && overlay && closeBtn) {
+        function openModal() {
+          overlay.classList.add('open');
+          document.body.style.overflow = 'hidden'; // 開啟時鎖住背景捲動
+        }
+        function closeModal() {
+          overlay.classList.remove('open');
+          document.body.style.overflow = '';
+        }
+        openBtn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        overlay.addEventListener('click', function (e) {
+          if (e.target === overlay) closeModal(); // 只有點到遮罩本身（非卡片內容）才關閉
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+        });
+      }
+    })();
+
     (function () {
       var btn = document.getElementById('safariJumpBtn');
       if (!btn) return;
