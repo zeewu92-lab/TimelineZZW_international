@@ -40,6 +40,10 @@ jobs:
             sed -i 's#<head>#<head>\n    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">#' dist/index.html
           fi
 
+          # 只在 App(Capacitor)環境套用 CSS zoom,還原原本用 initial-scale=0.75 想要的寬鬆密度感
+          # 網頁版/PWA 不受影響,因為 window.Capacitor 只存在於 App 環境
+          sed -i 's#</head>#    <style>html.cap-zoom { zoom: 0.82; }</style>\n    <script>if (window.Capacitor \&\& window.Capacitor.isNativePlatform \&\& window.Capacitor.isNativePlatform()) { document.documentElement.classList.add("cap-zoom"); }</script>\n  </head>#' dist/index.html
+
       - name: Clean and Recreate Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -84,12 +88,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y imagemagick
           mkdir -p resources
           if [ -f public/icon-512.png ]; then
-            convert public/icon-512.png -resize 66% -gravity center -background none -extent 512x512 resources/icon.png
+            convert public/icon-512.png -resize 78% -gravity center -background none -extent 512x512 resources/icon.png
           else
             echo "Icon not found, skipping."
           fi
           npm install @capacitor/assets --save-dev
-          npx capacitor-assets generate --android
+          npx capacitor-assets generate --android \
+            --iconBackgroundColor '#121419' \
+            --iconBackgroundColorDark '#121419'
 
       - name: Sync assets
         run: npx cap sync
