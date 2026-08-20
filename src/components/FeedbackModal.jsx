@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Send, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Send, Plus, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 
 const ACCENT = 'var(--accent, #6C7BE0)';
 const INK = 'var(--ink)';
 const INK_SOFT = 'var(--ink-soft)';
 const CARD_BORDER = '1px solid var(--card-border)';
 const INPUT_BG = 'var(--input-bg)';
+const CARD_BG = 'var(--card-bg)';
+const DANGER = '#FF004A';
 
 // 跟 AuthModal 用的是同一組玻璃感視窗樣式（毛玻璃卡片 + 半透明白底），
 // 讓「意見反饋」跟「帳號登入」視窗的質感一致，不會突然看起來像兩套不同的 UI。
@@ -21,6 +23,48 @@ const FEEDBACK_GLASS = {
 // Telegram sendMediaGroup 一次最多帶 10 張，這裡跟後端的分批邏輯（見 feedback.js）保持同一個上限，
 // 前端先擋掉超過的部分，使用者不用送出後才被後端拒絕。
 const MAX_IMAGES = 10;
+
+// 「建議」字數上限，純視覺提醒用——超過不會擋輸入，純粹讓使用者知道意見內容偏長，
+// 跟後端 feedback.js 真正的硬性驗證（message.length > 2000 才會被拒絕）數字保持一致，
+// 這樣「看起來超過建議值」跟「送出真的會失敗」不會兜不起來、造成使用者困惑。
+const MESSAGE_SUGGESTED_LIMIT = 2000;
+const MESSAGE_COLLAPSED_HEIGHT = 132;
+const MESSAGE_EXPANDED_HEIGHT = 300;
+
+// 「添加聯絡方式」二級選單的可選類型。id 是內部識別用的 key，label 是選單與已加項目上顯示的文字，
+// inputType／placeholder 用來讓對應的輸入框有正確的鍵盤與提示文字（例如手機號碼喚起數字鍵盤）。
+// 'other' 比較特別：需要使用者自己填「名稱」，所以在渲染與送出邏輯裡都會額外判斷這個 id。
+const CONTACT_TYPES = [
+  { id: 'wechat', label: 'WeChat', placeholder: 'WeChat 帳號' },
+  { id: 'qq', label: 'QQ', placeholder: 'QQ 號碼', inputType: 'tel' },
+  { id: 'phone', label: '手機號碼', placeholder: '手機號碼', inputType: 'tel' },
+  { id: 'email', label: 'E-mail', placeholder: 'E-mail 信箱', inputType: 'email' },
+  { id: 'whatsapp', label: 'WhatsApp', placeholder: 'WhatsApp 號碼', inputType: 'tel' },
+  { id: 'telegram', label: 'Telegram', placeholder: 'Telegram 帳號' },
+  { id: 'discord', label: 'Discord', placeholder: 'Discord 帳號' },
+  { id: 'facebook', label: 'Facebook', placeholder: 'Facebook 帳號／連結' },
+  { id: 'other', label: '其他', placeholder: '聯絡資訊' },
+];
+const CONTACT_TYPE_LABEL = Object.fromEntries(CONTACT_TYPES.map(c => [c.id, c.label]));
+
+// 「意見類型」二級選單的可選項目，單選——選了哪個就直接顯示在「意見類型」欄位裡，
+// 跟「添加聯絡方式」那組多選、可重複添加的選單性質不同，所以分開兩組常數與各自的 state。
+const FEEDBACK_TYPES = ['功能建議', '問題回報', '介面與體驗', '效能問題', '帳號與資料', '隱私與安全', '其他'];
+
+// 把已填寫的聯絡方式陣列組成一段文字，掛在既有的 'contact' 欄位送給後端——
+// 後端（feedback.js）本來就只是把 contact 當一段不透明的字串塞進 Telegram caption，
+// 這裡改成多行文字（每種聯絡方式一行）完全不需要動後端。
+function formatContactsForSubmit(contacts) {
+  return contacts
+    .map(c => {
+      const value = c.value.trim();
+      if (!value) return null;
+      const label = c.type === 'other' ? (c.label.trim() || '其他') : CONTACT_TYPE_LABEL[c.type];
+      return `${label}：${value}`;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
 
 export default function FeedbackModal({ onClose }) {
   // 進場／離場動畫：跟 AuthModal 同一套手法——先掛上 DOM（opacity 0 / 背景透明），
@@ -39,18 +83,74 @@ export default function FeedbackModal({ onClose }) {
   }
   const modalShown = modalPhase === 'shown';
 
-  // 按 Esc 關閉（跟 App 其他彈窗一致的操作習慣）
+  const [message, setMessage] = useState('');
+  // 「放大」輸入框：只是換一個高度呈現、方便輸入較長內容，不影響 message 本身的值。
+  const [messageExpanded, setMessageExpanded] = useState(false);
+  // 意見類型：單選，未選時是空字串——空字串代表「沒有選」，送出時就不會附加這個欄位，
+  // 完全不影響原本「只填意見內容就能送出」的流程。
+  const [feedbackType, setFeedbackType] = useState('');
+  const [feedbackTypeMenuOpen, setFeedbackTypeMenuOpen] = useState(false);
+  const feedbackTypeMenuRef = useRef(null);
+  // 多筆聯絡方式：每筆是 { id, type, label, value }。label 只有 type === 'other' 時才會用到
+  // （使用者自訂的名稱，例如「Line」），其餘類型的顯示名稱直接查 CONTACT_TYPE_LABEL。
+  const [contacts, setContacts] = useState([]);
+  const [contactMenuOpen, setContactMenuOpen] = useState(false);
+  const contactMenuRef = useRef(null);
+  const contactIdRef = useRef(0);
+
+  // 按 Esc 關閉：哪個選單／放大狀態最後開的就先收合哪個，都沒開才關閉整個視窗，
+  // 跟一般「一次 Esc 只收掉最上層那件事」的操作習慣一致。
   useEffect(() => {
     function onKeyDown(e) {
-      if (e.key === 'Escape' || e.key === 'Esc') handleClose();
+      if (e.key !== 'Escape' && e.key !== 'Esc') return;
+      if (feedbackTypeMenuOpen) setFeedbackTypeMenuOpen(false);
+      else if (contactMenuOpen) setContactMenuOpen(false);
+      else if (messageExpanded) setMessageExpanded(false);
+      else handleClose();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [feedbackTypeMenuOpen, contactMenuOpen, messageExpanded]);
 
-  const [message, setMessage] = useState('');
-  const [contact, setContact] = useState('');
+  // 點選單外面的地方就收合「意見類型」選單
+  useEffect(() => {
+    if (!feedbackTypeMenuOpen) return;
+    function handleClickOutside(e) {
+      if (feedbackTypeMenuRef.current && !feedbackTypeMenuRef.current.contains(e.target)) setFeedbackTypeMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [feedbackTypeMenuOpen]);
+
+  // 點選單外面的地方就收合「添加聯絡方式」選單
+  useEffect(() => {
+    if (!contactMenuOpen) return;
+    function handleClickOutside(e) {
+      if (contactMenuRef.current && !contactMenuRef.current.contains(e.target)) setContactMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [contactMenuOpen]);
+
+  // 已加入的類型（'其他' 除外）就不再顯示在選單裡，避免使用者不小心重複加兩個 WeChat；
+  // 「其他」允許加很多個（例如同時想留 Line 跟 Signal），所以不受這個限制。
+  const usedTypes = new Set(contacts.filter(c => c.type !== 'other').map(c => c.type));
+  const availableContactTypes = CONTACT_TYPES.filter(c => c.id === 'other' || !usedTypes.has(c.id));
+
+  function addContact(typeId) {
+    contactIdRef.current += 1;
+    setContacts(prev => [...prev, { id: contactIdRef.current, type: typeId, label: '', value: '' }]);
+    setContactMenuOpen(false);
+  }
+
+  function updateContact(id, patch) {
+    setContacts(prev => prev.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  function removeContact(id) {
+    setContacts(prev => prev.filter(c => c.id !== id));
+  }
   // 多圖：每張存 { file, url }，url 是 URL.createObjectURL 產生的本機預覽網址，
   // 卸載或移除圖片時要記得 revoke，不然分頁開久了會累積記憶體。
   const [images, setImages] = useState([]);
@@ -93,7 +193,9 @@ export default function FeedbackModal({ onClose }) {
 
     const formData = new FormData();
     formData.append('message', message);
-    if (contact) formData.append('contact', contact);
+    if (feedbackType) formData.append('feedbackType', feedbackType);
+    const contactText = formatContactsForSubmit(contacts);
+    if (contactText) formData.append('contact', contactText);
     // 多張圖片用同一個欄位名重複 append，後端用 form.getAll('images') 收成陣列，
     // 再決定要 sendMediaGroup（相簿效果）還是逐張 sendPhoto。
     images.forEach(img => formData.append('images', img.file, img.file.name || 'image.jpg'));
@@ -148,24 +250,171 @@ export default function FeedbackModal({ onClose }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="想跟我們說什麼？"
-                maxLength={2000}
-                required
-                rows={4}
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
-              />
-              <input
-                type="text"
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                placeholder="聯絡方式（選填）"
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
-              />
+              {/* 意見類型：單選欄位，樣式跟下面的 textarea／輸入框同一套 token（INPUT_BG／CARD_BORDER／
+                  rounded-xl），視覺上是「一個可點的輸入框」而不是獨立的按鈕語彙，跟整體表單風格一致。
+                  點擊後展開二級選單，選好某一項就直接寫回這個欄位、選單自動收合。 */}
+              <div className="relative" ref={feedbackTypeMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackTypeMenuOpen(v => !v)}
+                  className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-sm"
+                  style={{ background: INPUT_BG, color: feedbackType ? INK : INK_SOFT, border: CARD_BORDER }}
+                >
+                  <span>{feedbackType || '意見類型（選填）'}</span>
+                  <ChevronDown size={14} style={{ color: INK_SOFT, transform: feedbackTypeMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease', flexShrink: 0 }} />
+                </button>
+                {feedbackTypeMenuOpen && (
+                  <div
+                    className="absolute left-0 right-0 mt-2 rounded-xl overflow-hidden z-20"
+                    style={{ background: CARD_BG, backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                  >
+                    {FEEDBACK_TYPES.map(ft => (
+                      <button
+                        key={ft}
+                        type="button"
+                        onClick={() => { setFeedbackType(ft); setFeedbackTypeMenuOpen(false); }}
+                        className="w-full text-left px-3 py-2 text-sm"
+                        style={{ color: ft === feedbackType ? ACCENT : INK, background: ft === feedbackType ? 'var(--card-border)' : 'transparent' }}
+                      >
+                        {ft}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* 意見內容輸入區：外層是統一的圓角背景容器（INPUT_BG／CARD_BORDER，深淺色都會跟著
+                  CSS 變數切換，對比度由 App 既有的色票保證），textarea 本身貼滿容器、背景透明，
+                  右上角疊字數統計、右下角疊放大／收合按鈕——都用 padding 讓輸入文字自動避開，
+                  不會被蓋住。展開只是改容器高度＋CSS transition，內容與游標位置完全不受影響。 */}
+              <div
+                className="relative w-full rounded-xl overflow-hidden"
+                style={{
+                  background: INPUT_BG,
+                  border: CARD_BORDER,
+                  height: messageExpanded ? MESSAGE_EXPANDED_HEIGHT : MESSAGE_COLLAPSED_HEIGHT,
+                  transition: 'height 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+                }}
+              >
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="想跟我們說什麼？"
+                  required
+                  className="absolute inset-0 w-full h-full text-sm outline-none resize-none bg-transparent"
+                  style={{ color: INK, padding: '28px 12px 34px 12px', border: 'none' }}
+                />
+                {/* 字數統計：純視覺提醒，不設 maxLength，超過建議字數也能繼續輸入；
+                    只有超過時前面的數字變紅，斜線後的建議上限文字顏色維持不變。 */}
+                <span
+                  className="absolute top-2 right-3 text-[11px] font-bold pointer-events-none"
+                  style={{ color: INK_SOFT }}
+                >
+                  <span style={{ color: message.length > MESSAGE_SUGGESTED_LIMIT ? DANGER : INK_SOFT }}>
+                    {message.length}
+                  </span>
+                  /{MESSAGE_SUGGESTED_LIMIT}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMessageExpanded(v => !v)}
+                  className="absolute bottom-2 right-2 flex items-center justify-center rounded-lg"
+                  style={{ width: 24, height: 24, background: 'var(--card-border)', color: INK_SOFT }}
+                  title={messageExpanded ? '收起輸入框' : '放大輸入框'}
+                >
+                  {messageExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                </button>
+              </div>
+              {/* 「添加聯絡方式」按鈕＋二級選單：按鈕本身沿用跟圖片新增方塊一致的虛線樣式語彙，
+                  只是換成橫向的文字按鈕；選單樣式比照 App 裡 LangSwitcher 的下拉選單質感。
+                  選好類型後，對應的輸入框會動態出現在下方（見下面 contacts.map 那一段）。 */}
+              <div className="relative" ref={contactMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setContactMenuOpen(v => !v)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold"
+                  style={{ border: '1px dashed var(--card-border)', color: INK_SOFT }}
+                >
+                  <Plus size={14} />
+                  添加聯絡方式
+                  {availableContactTypes.length > 0 && (
+                    <ChevronDown size={14} style={{ transform: contactMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }} />
+                  )}
+                </button>
+                {contactMenuOpen && availableContactTypes.length > 0 && (
+                  <div
+                    className="absolute left-0 mt-2 rounded-xl overflow-hidden z-20"
+                    style={{ width: 160, background: CARD_BG, backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                  >
+                    {availableContactTypes.map(ct => (
+                      <button
+                        key={ct.id}
+                        type="button"
+                        onClick={() => addContact(ct.id)}
+                        className="w-full text-left px-3 py-2 text-sm"
+                        style={{ color: INK }}
+                      >
+                        {ct.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 已加入的聯絡方式：每一筆都是可直接編輯的輸入框＋刪除按鈕，
+                  '其他' 額外多一個「名稱」輸入框讓使用者自訂顯示文字。 */}
+              {contacts.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {contacts.map(c => (
+                    <div key={c.id} className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="flex-shrink-0 text-xs font-bold px-2 py-2 rounded-xl text-center"
+                          style={{ background: INPUT_BG, color: INK_SOFT, minWidth: 64 }}
+                        >
+                          {CONTACT_TYPE_LABEL[c.type]}
+                        </span>
+                        {c.type === 'other' ? (
+                          <input
+                            type="text"
+                            value={c.label}
+                            onChange={(e) => updateContact(c.id, { label: e.target.value })}
+                            placeholder="名稱，如 Line"
+                            className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
+                            style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                          />
+                        ) : (
+                          <input
+                            type={CONTACT_TYPES.find(t => t.id === c.type)?.inputType || 'text'}
+                            value={c.value}
+                            onChange={(e) => updateContact(c.id, { value: e.target.value })}
+                            placeholder={CONTACT_TYPES.find(t => t.id === c.type)?.placeholder}
+                            className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
+                            style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeContact(c.id)}
+                          className="flex-shrink-0 flex items-center justify-center rounded-full"
+                          style={{ width: 26, height: 26, color: INK_SOFT }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {c.type === 'other' && (
+                        <input
+                          type="text"
+                          value={c.value}
+                          onChange={(e) => updateContact(c.id, { value: e.target.value })}
+                          placeholder="聯絡資訊"
+                          className="rounded-xl px-3 py-2 text-sm outline-none"
+                          style={{ marginLeft: 72, background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* 圖片縮圖列：已選的圖片＋一個「新增」方塊，超過上限就不再顯示新增方塊 */}
               <div className="flex flex-wrap gap-2">
@@ -195,10 +444,11 @@ export default function FeedbackModal({ onClose }) {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                    className="flex items-center justify-center rounded-lg flex-shrink-0"
-                    style={{ width: 64, height: 64, border: '1px dashed var(--card-border)', color: INK_SOFT }}
+                    className="flex items-center justify-center gap-1.5 rounded-lg flex-shrink-0 px-3 text-xs font-bold"
+                    style={{ height: 64, border: '1px dashed var(--card-border)', color: INK_SOFT }}
                   >
                     <Plus size={20} />
+                    上傳圖片檔案
                   </button>
                 )}
               </div>
@@ -217,7 +467,7 @@ export default function FeedbackModal({ onClose }) {
               )}
 
               {status === 'error' && (
-                <p className="text-xs font-bold" style={{ color: '#FF004A' }}>
+                <p className="text-xs font-bold" style={{ color: DANGER }}>
                   傳送失敗，請稍後再試
                 </p>
               )}
