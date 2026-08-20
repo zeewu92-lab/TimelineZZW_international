@@ -46,7 +46,7 @@ jobs:
 
       - name: Clean and Recreate Android Platform
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app
           rm -rf android
 
           cat << 'EOF' > capacitor.config.json
