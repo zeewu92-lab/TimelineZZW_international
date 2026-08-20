@@ -7,6 +7,7 @@ import {
   getCurrentUserProviderId, changePassword, deleteAccount,
 } from './lib/auth.js';
 import { loadCloudData, saveCloudData } from './lib/cloudSync.js';
+import FeedbackModal from './components/FeedbackModal.jsx';
 
 const INK = 'var(--ink)';
 const INK_SOFT = 'var(--ink-soft)';
@@ -6709,6 +6710,7 @@ export default function App() {
   // ---- 帳號登入／雲端同步 ----
   const [fbUser, setFbUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [pendingMerge, setPendingMerge] = useState(null); // { local, cloud } 需要使用者選擇時才會有值
   const [syncStatus, setSyncStatus] = useState(null); // null | 'syncing' | 'synced'
   const syncReadyRef = useRef(false); // 是否已經完成登入時的資料比對／合併，之後才開始自動推送變更
@@ -7264,6 +7266,14 @@ export default function App() {
               t={t}
             />
             <button
+              onClick={() => setShowFeedbackModal(true)}
+              className="flex items-center justify-center rounded-full flex-shrink-0"
+              style={{ ...glass(), width: 34, height: 34, color: INK }}
+              title="意見回饋"
+            >
+              <Mail size={16} />
+            </button>
+            <button
               onClick={() => setIsDark(v => !v)}
               className="flex items-center justify-center rounded-full flex-shrink-0"
               style={{ ...glass(), width: 34, height: 34, color: INK }}
@@ -7360,6 +7370,9 @@ export default function App() {
           backupData={{ clocks, events, lang, isDark, customIcons }}
           onImportBackup={applyCloudData}
         />
+      )}
+      {showFeedbackModal && (
+        <FeedbackModal onClose={() => setShowFeedbackModal(false)} />
       )}
       {pendingMerge && <MergeDialog t={t} onResolve={resolveMerge} />}
       {fileHandlerMsg && (
