@@ -326,9 +326,52 @@
     color: var(--ink);
     text-align: left;
   }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .modal-action-btn {
+    flex: 1;
+    width: auto;
+    margin-top: 0;
+    border-radius: 999px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+  }
+
+  .back-web-btn {
+    position: fixed;
+    top: max(18px, env(safe-area-inset-top));
+    left: 18px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px 9px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow-icon);
+    transition: opacity 0.2s ease;
+  }
+  .back-web-btn:active { opacity: 0.75; }
+  .back-web-btn svg { flex-shrink: 0; }
 </style>
 </head>
 <body>
+
+  <button type="button" id="backWebOpenBtn" class="back-web-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    回到網頁端
+  </button>
 
   <div class="card">
     <img class="icon" src="icon-512.png" alt="時光線 App 圖示">
@@ -379,6 +422,24 @@
     </div>
   </div>
 
+  <!-- 回到網頁端說明彈窗：預設隱藏，樣式與「對於 Apple 使用者」彈窗統一。內容待補。 -->
+  <div class="modal-overlay" id="backWebModalOverlay">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="backWebModalTitle">
+      <button type="button" class="modal-close" id="backWebModalCloseBtn" aria-label="關閉">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+      </button>
+      <h2 id="backWebModalTitle" class="modal-title">溫馨提示</h2>
+
+      <p class="apple-answer">若您選擇暫時使用網頁端「時光線」，請務必<strong>註冊／登入帳號</strong>，或在體驗結束後及時利用<strong>本機備份</strong>功能將您所上傳建立的資料<strong>同步至雲端</strong>或<strong>匯出到本地</strong>。</p>
+      <p class="apple-answer">＊帳號註冊／登入及雲端功能暫不向中國大陸地區開放</p>
+
+      <div class="modal-actions">
+        <button type="button" id="backWebReturnBtn" class="safari-btn modal-action-btn">返回下載</button>
+        <a href="https://timezzw.top" id="backWebEnterBtn" class="download-btn is-live modal-action-btn" rel="noopener">進入網頁</a>
+      </div>
+    </div>
+  </div>
+
   
   <script>
     (function () {
@@ -399,6 +460,33 @@
         closeBtn.addEventListener('click', closeModal);
         overlay.addEventListener('click', function (e) {
           if (e.target === overlay) closeModal(); // 只有點到遮罩本身（非卡片內容）才關閉
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+        });
+      }
+    })();
+
+    (function () {
+      // 回到網頁端說明彈窗：開/關 + 點遮罩空白處關閉 + Esc 鍵關閉。
+      var openBtn = document.getElementById('backWebOpenBtn');
+      var overlay = document.getElementById('backWebModalOverlay');
+      var closeBtn = document.getElementById('backWebModalCloseBtn');
+      var returnBtn = document.getElementById('backWebReturnBtn');
+      if (openBtn && overlay && closeBtn) {
+        function openModal() {
+          overlay.classList.add('open');
+          document.body.style.overflow = 'hidden';
+        }
+        function closeModal() {
+          overlay.classList.remove('open');
+          document.body.style.overflow = '';
+        }
+        openBtn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        if (returnBtn) returnBtn.addEventListener('click', closeModal); // 「返回下載」＝關閉彈窗，回到下載卡片
+        overlay.addEventListener('click', function (e) {
+          if (e.target === overlay) closeModal();
         });
         document.addEventListener('keydown', function (e) {
           if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
