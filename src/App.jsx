@@ -6575,6 +6575,11 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [isDark, setIsDark] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // 版本更新提醒：只在 App(Capacitor 原生環境)裡，啟動時去問 GitHub 目前「已發布」的
+  // 最新版本是多少（GitHub API 只回傳已發布的正式版，草稿不會出現，不用擔心把還在測試的
+  // 草稿誤判成新版本），跟目前安裝的版本（來自 android/app/build.gradle 的 versionName，
+  // 也就是 build workflow 裡那個 --version 輸入值）不一樣時，才顯示提醒。
+  const [updateInfo, setUpdateInfo] = useState(null);
   // EVENTS_KEY（本機備份）最近一次寫入是否失敗——目前只有這個 key 有風險（事件量大＋標題很長時
   // 才可能頂到 window.storage 單一 key 的大小上限；相片已經另外拆到各自的 key，不會再拖累這裡)。
   // 供帳號按鈕顯示小紅點提示，避免存失敗卻完全沒人知道。
@@ -7056,6 +7061,35 @@ export default function App() {
     }
   }, []);
 
+  // 版本更新檢查：只在 App 環境跑，透過 @capacitor/app 外掛讀出目前安裝版本（App.getInfo().version，
+  // 對應 android/app/build.gradle 的 versionName），跟 GitHub「最新已發布」release 的 tag 比對。
+  // window.Capacitor.Plugins.App 是 Capacitor 核心橋接自動產生的代理，不需要在原始碼裡另外
+  // import '@capacitor/app'，只要 workflow 有裝這個外掛、跑過 cap sync 讓它被原生端註冊即可。
+  // 版本號用 x.y.z 逐段數字比較（而非字串比較），避免 "1.0.9" 被誤判比 "1.0.10" 新。
+  useEffect(() => {
+    if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) return;
+    (async () => {
+      try {
+        const appInfo = await window.Capacitor.Plugins.App.getInfo();
+        const currentVersion = appInfo.version;
+        const res = await fetch('https://api.github.com/repos/zeewu92-lab/sgx.tzzwnb/releases/latest');
+        if (!res.ok) return;
+        const data = await res.json();
+        const latestVersion = String(data.tag_name || '').replace(/^v/, '');
+        if (!currentVersion || !latestVersion) return;
+        const toParts = (v) => v.split('.').map(n => parseInt(n, 10) || 0);
+        const [cMajor, cMinor, cPatch] = toParts(currentVersion);
+        const [lMajor, lMinor, lPatch] = toParts(latestVersion);
+        const isNewer = lMajor > cMajor
+          || (lMajor === cMajor && lMinor > cMinor)
+          || (lMajor === cMajor && lMinor === cMinor && lPatch > cPatch);
+        if (isNewer) setUpdateInfo({ latestVersion });
+      } catch (err) {
+        // 檢查失敗（離線、API 限流等）就靜靜放過，不影響 App 正常使用
+      }
+    })();
+  }, []);
+
   const t = STRINGS[lang];
   const now = nowTick;
   const todayStr = new Intl.DateTimeFormat(LOCALE_MAP[lang], { month: 'long', day: 'numeric', weekday: 'long' }).format(now);
@@ -7121,7 +7155,17 @@ export default function App() {
         button:active, [role="button"]:active {
           transform: scale(0.96);
         }
+        /* 深色／淺色模式切換動畫：原本只有 body 背景色有淡入淡出，卡片、標題列等其他
+           用 var(--card-bg)／var(--ink)／var(--card-border) 的地方是瞬間切換，
+           兩者步調不一致看起來很怪。這裡把整個 App 範圍內的 background-color／color／
+           border-color 都加上同樣時長的 transition，讓整個畫面的顏色一起變化。
+           範圍限定在 #app-root 底下，不會影響到這個容器以外的東西（例如彈窗遮罩本身
+           刻意用不同的 transition 時間，不受這裡影響）。 */
+        #app-root, #app-root * {
+          transition: background-color 450ms ease, border-color 450ms ease, color 450ms ease;
+        }
       `}</style>
+      <div id="app-root" className="flex flex-col overflow-hidden" style={{ ...cssVars, height: '100dvh', background: 'transparent', fontFamily: "'Inter', sans-serif" }}>
       {/* 縮放已經改由 index.html 的 viewport meta（initial-scale=0.75, user-scalable=no）
           統一在瀏覽器層級處理，這裡不再另外用 --ui-scale／transform 疊加一層。
           原本在這裡加的那層 JS 動態縮放，是靠 window.innerWidth 判斷裝置寬度決定要不要縮小；
@@ -7131,7 +7175,33 @@ export default function App() {
           又疊加一次 CSS transform 縮放——這正是先前陸續出現「底部裁切」「整個置中留白」等
           問題的根本原因：兩層縮放互相打架。縮放只該有一層，交給 viewport meta 統一處理最乾淨、
           也最不會有計算誤差（字級、間距、留白全部由瀏覽器原生等比例一起處理）。 */}
-      <div className="flex flex-col overflow-hidden" style={{ ...cssVars, height: '100dvh', background: 'transparent', fontFamily: "'Inter', sans-serif", transition: 'background 0.2s' }}>
+        {/* 版本更新提醒彈窗：updateInfo 只有在偵測到 GitHub 已發布的最新版本比目前安裝版本
+            新的時候才會有值（見上面的版本檢查 useEffect）。放在最外層容器最前面、蓋在所有
+            內容之上，「稍後再說」單純關閉不留痕跡（下次重開 App 還是會再檢查一次），
+            「立即更新」會導去 timezzw.top/download 下載頁，使用者在那頁
+            點 apk 檔案連結下載安裝即可。 */}
+        {updateInfo && (
+          <div className="fixed inset-0 flex items-center justify-center px-6" style={{ zIndex: 500, background: 'rgba(0,0,0,0.5)' }}>
+            <div className="w-full rounded-3xl p-6" style={{ maxWidth: 340, background: CARD_BG, boxShadow: '0 20px 60px rgba(0,0,0,0.35)' }}>
+              <div className="text-lg font-bold mb-2" style={{ color: INK }}>發現新版本 v{updateInfo.latestVersion}</div>
+              <div className="text-sm mb-5" style={{ color: INK_SOFT }}>建議更新以取得最新功能與修正。</div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setUpdateInfo(null)}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ background: 'var(--card-border)', color: INK }}>
+                  稍後再說
+                </button>
+                <button
+                  onClick={() => { window.location.href = 'https://timezzw.top/download'; }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ background: ACCENT, color: '#fff' }}>
+                  立即更新
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header — 固定不動，不再需要 sticky（父層本身已不捲動）。
             這裡的 backdropFilter 會讓 header 自成一個新的堆疊環境（stacking context），
             裡面「切換語言」選單雖然設了 z-20，範圍也只在 header 自己這個環境內有效；
