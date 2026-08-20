@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>時光線 － 下載</title>
+<title>時光線-下載</title>
 <meta name="description" content="時光線 App 下載頁">
 <link rel="icon" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -170,6 +170,76 @@
     color: var(--ink-soft);
     letter-spacing: 0.03em;
   }
+
+  .apple-toggle {
+    width: 100%;
+    margin-top: 22px;
+    border-top: 1px solid var(--card-border);
+    padding-top: 18px;
+  }
+
+  .apple-toggle summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    padding: 4px 0;
+    transition: color 0.2s ease;
+  }
+  .apple-toggle summary::-webkit-details-marker { display: none; }
+  .apple-toggle summary:active { color: var(--ink); }
+
+  .apple-toggle summary svg.apple-icon { flex-shrink: 0; }
+
+  .apple-toggle summary .chevron {
+    flex-shrink: 0;
+    transition: transform 0.25s ease;
+  }
+  .apple-toggle[open] summary .chevron { transform: rotate(180deg); }
+
+  .apple-toggle .apple-answer {
+    margin: 12px 0 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    animation: fadeSlideIn 0.25s ease;
+  }
+  .apple-toggle .apple-answer + .apple-answer {
+    margin-top: 10px;
+  }
+
+  .safari-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 13px 20px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.2s ease, border-color 0.2s ease;
+    animation: fadeSlideIn 0.25s ease;
+  }
+  .safari-btn:active { opacity: 0.8; }
+  .safari-btn svg { flex-shrink: 0; }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
@@ -177,22 +247,61 @@
   <div class="card">
     <img class="icon" src="icon-512.png" alt="時光線 App 圖示">
     <h1 class="app-name">時光線</h1>
-    <p class="app-tagline">把重要的日子，串成一條看得見的時間軸。</p>
+    <p class="app-tagline">把你在乎的日子，串成一條有形的時間軸。</p>
 
     <div class="platform-row">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.523 15.341a1.09 1.09 0 1 1 0-2.18 1.09 1.09 0 0 1 0 2.18Zm-11.046 0a1.09 1.09 0 1 1 0-2.18 1.09 1.09 0 0 1 0 2.18Zm11.404-6.02.002-.006 2.02-3.5a.416.416 0 0 0-.152-.567.416.416 0 0 0-.567.152l-2.046 3.543a11.86 11.86 0 0 0-9.276 0L5.816 5.4a.416.416 0 0 0-.567-.152.416.416 0 0 0-.152.567l2.02 3.5.002.006C3.94 11.166 1.756 14.407 1.5 18.2h21c-.256-3.793-2.44-7.034-5.619-8.879Z"/></svg>
       Android APK
     </div>
 
-    <!-- 先佔位，APK 檔案連結準備好之後，把 button 換成 <a href="真正的 APK 網址" class="download-btn is-live" download> -->
-    <button class="download-btn" disabled>
-      敬請期待
-    </button>
-    <p class="note">Android APK 下載連結準備中，上線後會直接開放下載。</p>
+    <a href="https://github.com/zeewu92-lab/sgx.tzzwnb/releases/download/untagged-ad0c7697831f53596111/app-release.apk" class="download-btn is-live" download>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      立即下載
+    </a>
+    <p class="note">「時光線」為個人獨立開發的應用程式，因未經應用程式商店審核，部分裝置可能會發生安全提醒，請確認下載來源後放心下載使用。</p>
 
     <div class="divider"></div>
     <span class="version">TIMEZZW.TOP</span>
+
+    <details class="apple-toggle">
+      <summary>
+        <svg class="apple-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.11.55-2.2 1.19-2.98.75-.94 2.05-1.65 3.12-1.68.02.13.04.28.04.4zm4.565 15.71c-.03.07-.463 1.582-1.535 3.128-.94 1.365-1.9 2.752-3.43 2.78-1.502.028-1.985-.9-3.7-.9-1.716 0-2.253.868-3.678.928-1.474.06-2.6-1.478-3.55-2.837-1.933-2.79-3.41-7.885-1.427-11.31.982-1.7 2.738-2.78 4.646-2.81 1.443-.028 2.805.972 3.688.972.882 0 2.53-1.202 4.266-1.026.727.03 2.766.294 4.076 2.213-.105.066-2.434 1.42-2.406 4.24.03 3.37 2.96 4.494 2.994 4.51z"/></svg>
+        <span>您是 Apple 用戶？</span>
+        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <p class="apple-answer">「時光線」目前尚未在 App Store 上架。Apple 使用者請使用 Safari 瀏覽器開啟 👉timezzw.top，並「加入主畫面」進行體驗。</p>
+      <p class="apple-answer">加入主畫面後，無須手動下載或更新。每次重新整理網頁，即可使用最新版本。</p>
+
+      <!-- 一鍵跳轉 Safari：先嘗試 iOS 專屬的 x-safari-https scheme，強制在 Safari 開啟（適用於使用者目前是在
+           Chrome、Line、微信等內建瀏覽器裡點開本頁的情境）；短時間內頁面若還在（代表沒跳成功，例如非 iOS 裝置
+           或本身就已經在 Safari 裡），才退回一般網址開新分頁，確保任何情況下都能到得了 timezzw.top。 -->
+      <a href="https://timezzw.top" id="safariJumpBtn" class="safari-btn" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9.4"/><path d="M15.5 8.5 12.9 12.9 8.5 15.5l2.6-4.4Z" fill="currentColor" stroke-linejoin="round"/></svg>
+        一鍵在 Safari 開啟
+      </a>
+    </details>
   </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('safariJumpBtn');
+      if (!btn) return;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        var target = 'https://timezzw.top';
+        var start = Date.now();
+        // 嘗試強制在 Safari 開啟（僅 iOS 支援這個系統層級的 scheme）
+        window.location.href = 'x-safari-https://timezzw.top';
+        setTimeout(function () {
+          // 若頁面仍在前景、且時間沒過太久，代表剛剛那次跳轉沒有真的離開，
+          // 就退回一般連結（新分頁），涵蓋 Android／桌機／已經在 Safari 裡等情況
+          if (!document.hidden && Date.now() - start < 1600) {
+            window.open(target, '_blank', 'noopener');
+          }
+        }, 900);
+      });
+    })();
+  </script>
 
 </body>
 </html>
