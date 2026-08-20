@@ -4136,15 +4136,19 @@ function TimelineSection({
   function renderEventCard(ev) {
     return (
       <div key={ev.id} className="relative pl-6" style={{ zIndex: 10 }}>
-        {/* 圓點指示器：整個事件項目建立獨立堆疊層，圓點永遠位於時間軸線與卡片之上。 */}
+        {/* 圓點指示器：整個事件項目建立獨立堆疊層，圓點永遠位於時間軸線與卡片之上。
+            left／top 用 rem 而非寫死 px，縮放時才會跟軸線同步移動、保持對齊。
+            拿掉了原本 boxShadow 最外層跟背景同色的那圈（0 0 0 2px var(--page-bg)），
+            那圈視覺上太粗，看起來像把軸線整個截斷；只留 border 的 page-bg 圈（讓圓點跟
+            軸線之間有一圈鏤空分隔）跟 boxShadow 內層的 card-border 細圈（輪廓）。 */}
         <div
           className="absolute w-4 h-4 rounded-full"
           style={{
             background: colorHex(ev.colorId),
-            left: -25,
-            top: 4,
+            left: '-1.375rem',
+            top: '0.25rem',
             border: '3px solid var(--page-bg)',
-            boxShadow: '0 0 0 1px var(--card-border), 0 0 0 2px var(--page-bg)',
+            boxShadow: '0 0 0 1px var(--card-border)',
             zIndex: 20,
             pointerEvents: 'none',
           }}
@@ -7048,10 +7052,17 @@ export default function App() {
   useEffect(() => { document.body.style.transition = 'background 450ms ease'; }, []);
   useEffect(() => { document.body.style.background = isDark ? '#121419' : '#FFFFFF'; }, [isDark]);
 
-  // 曾經在這裡用調整根字級（rem 縮放）模擬「更寬鬆密度」的效果，但實測發現這會跟其他用
-  // 寫死 px 值定位的元件（例如時間軸圓點指示器的 left: -25，是針對「不縮放」的排版校準
-  // 出來的數字）互相打架，導致圓點跟軸線對不齊。比對實際效果後確認：不縮放（保持根字級
-  // 100%）才是想要的樣子，所以這裡不再做任何縮放。
+  // App(Capacitor 原生環境)想要達到跟網頁版 PWA（viewport initial-scale=0.75）相同的密度感，
+  // 但 Android WebView 對 initial-scale<1 支援不穩定（先前導致內容爆版），所以改用調整根字級
+  // （rem 縮放）達成相同視覺效果。Tailwind 的 padding／gap／字級絕大多數都是 rem 為單位，
+  // 改根字級會讓整體排版等比例縮小。上面時間軸圓點指示器原本用寫死的 px 值定位（left: -25），
+  // 沒有跟著 rem 一起縮放才會跟軸線對不齊；已經把那處改成 rem，這裡才能放心重新套用縮放。
+  // 只在 App 環境套用；網頁版／PWA 完全不受影響，繼續用自己的 viewport 設定。
+  useEffect(() => {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      document.documentElement.style.fontSize = '68%';
+    }
+  }, []);
 
   // 修正 App 頂部跟手機狀態列（時間、電量那排）重疊的問題。Capacitor 預設在較新版本會讓
   // WebView 畫面延伸到狀態列底下（edge-to-edge），需要用 @capacitor/status-bar 外掛明確
@@ -7214,7 +7225,11 @@ export default function App() {
             header 跟下面的 <main> 是同一層的手足元素，沒有明確 z-index 時瀏覽器會照 DOM
             順序疊圖，導致排在後面的 <main>（例如世界時鐘的「添加時區」按鈕）蓋掉了 header
             展開的語言選單。加上 zIndex 讓 header 整層明確疊在 main 之上即可解決。 */}
-        <header className="px-6 py-6 flex items-center justify-between flex-shrink-0" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(10px)', position: 'relative', zIndex: 30 }}>
+        {/* paddingTop 用 env(safe-area-inset-top) 疊加一層保險：上面已經用 StatusBar 外掛
+            告訴系統「畫面別疊到狀態列下面」，但不同機型／WebView 版本讓開的量可能還是有些
+            微差異，這裡再用瀏覽器原生的安全區域變數多留一點空間。網頁版／沒有安全區域概念
+            的環境下 env() 會是 0，不會多留任何空白，不影響 PWA 原本的間距。 */}
+        <header className="px-6 py-6 flex items-center justify-between flex-shrink-0" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(10px)', position: 'relative', zIndex: 30, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
           <div>
             <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>{t[greeting.key]} {greeting.emoji}</h1>
             <p className="text-xs font-medium mt-1" style={{ color: INK_SOFT }}>{t.todayIs(todayStr)}</p>
