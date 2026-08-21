@@ -5,19 +5,21 @@ export const config = { runtime: 'edge' };
 // 達成「多圖也能穩定送出、又盡量用相簿效果」的效果。
 const MEDIA_GROUP_MAX = 10;
 
-// 每筆回饋的短碼：時間戳記（base36，取最後 5 碼）+ 4 碼隨機字元，方便在 Telegram 裡肉眼
-// 辨識／引用。這裡老實說清楚它的保證等級：
+// 每筆回饋的短碼：固定前綴 sgxufb（純識別用，不提供隨機性）+ 5 碼時間戳記（base36，取最後
+// 5 碼）+ 5 碼純數字隨機碼，方便在 Telegram 裡肉眼辨識／引用。保證等級跟前一版一樣是
+// 「機率夠低」而非「保證唯一」：
 // - 時間戳記那 5 碼本質是「目前毫秒數 mod 36^5」，大約每 16.8 小時就會完整繞回重複一次
-//   （這是數學上確定會發生的週期性重複，不是機率問題）。
-// - 只有當兩筆意見剛好落在同一個週期內的同一毫秒送出時，才需要靠後面的隨機字元來避免撞號；
-//   4 碼隨機字元有 36^4 ≈ 168 萬種組合，撞號機率非常低，但不是「保證絕對不重複」。
+//   （數學上確定會發生的週期性重複，不是機率問題）。
+// - 只有當兩筆意見剛好落在同一個週期內的同一毫秒送出時，才需要靠後面的隨機數字避免撞號；
+//   5 碼純數字只有 10^5 = 10 萬種組合，比前一版「4 碼英數混合」的 168 萬種組合少了超過
+//   16 倍，撞號機率會比前一版略高，但對小規模使用仍然足夠低，不用擔心。
 // - 這裡完全沒有查資料庫確認是否已存在同樣的碼——單純是「機率夠低到小規模使用不用擔心」，
 //   不是嚴格唯一鍵。之後如果接了 Firestore（見前面的雙向回覆方案），建議直接拿
 //   Firestore 自動產生的 feedbackId（保證唯一）取代這裡的短碼，或送出前先查一次是否重複。
 function generateFeedbackCode() {
   const time = Date.now().toString(36).toUpperCase().slice(-5);
-  const rand = Math.random().toString(36).toUpperCase().slice(2, 6).padEnd(4, '0');
-  return `FB${time}${rand}`;
+  const rand = Array.from({ length: 5 }, () => Math.floor(Math.random() * 10)).join('');
+  return `sgxufb${time}${rand}`;
 }
 
 async function sendMessage(caption) {
