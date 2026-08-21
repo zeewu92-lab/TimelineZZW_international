@@ -31,7 +31,7 @@ const MESSAGE_SUGGESTED_LIMIT = 2000;
 const MESSAGE_COLLAPSED_HEIGHT = 132;
 const MESSAGE_EXPANDED_HEIGHT = 300;
 
-// 「添加聯絡方式」二級選單的可選類型。id 是內部識別用的 key，label 是選單與已加項目上顯示的文字，
+// 「新增聯絡方式」二級選單的可選類型。id 是內部識別用的 key，label 是選單與已加項目上顯示的文字，
 // inputType／placeholder 用來讓對應的輸入框有正確的鍵盤與提示文字（例如手機號碼喚起數字鍵盤）。
 // 'other' 比較特別：需要使用者自己填「名稱」，所以在渲染與送出邏輯裡都會額外判斷這個 id。
 const CONTACT_TYPES = [
@@ -48,7 +48,7 @@ const CONTACT_TYPES = [
 const CONTACT_TYPE_LABEL = Object.fromEntries(CONTACT_TYPES.map(c => [c.id, c.label]));
 
 // 「意見類型」二級選單的可選項目，單選——選了哪個就直接顯示在「意見類型」欄位裡，
-// 跟「添加聯絡方式」那組多選、可重複添加的選單性質不同，所以分開兩組常數與各自的 state。
+// 跟「新增聯絡方式」那組多選、可重複添加的選單性質不同，所以分開兩組常數與各自的 state。
 const FEEDBACK_TYPES = ['功能建議', '問題回報', '介面與體驗', '效能問題', '帳號與資料', '隱私與安全', '其他'];
 
 // 把已填寫的聯絡方式陣列組成一段文字，掛在既有的 'contact' 欄位送給後端——
@@ -123,7 +123,7 @@ export default function FeedbackModal({ onClose }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [feedbackTypeMenuOpen]);
 
-  // 點選單外面的地方就收合「添加聯絡方式」選單
+  // 點選單外面的地方就收合「新增聯絡方式」選單
   useEffect(() => {
     if (!contactMenuOpen) return;
     function handleClickOutside(e) {
@@ -266,7 +266,7 @@ export default function FeedbackModal({ onClose }) {
                 {feedbackTypeMenuOpen && (
                   <div
                     className="absolute left-0 right-0 mt-2 rounded-xl overflow-hidden z-20"
-                    style={{ background: CARD_BG, backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                    style={{ background: CARD_BG, border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
                   >
                     {FEEDBACK_TYPES.map(ft => (
                       <button
@@ -324,8 +324,8 @@ export default function FeedbackModal({ onClose }) {
                   {messageExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
                 </button>
               </div>
-              {/* 「添加聯絡方式」按鈕＋二級選單：按鈕本身沿用跟圖片新增方塊一致的虛線樣式語彙，
-                  只是換成橫向的文字按鈕；選單樣式比照 App 裡 LangSwitcher 的下拉選單質感。
+              {/* 「新增聯絡方式」按鈕＋二級選單：按鈕本身沿用虛線樣式語彙的橫向文字按鈕；
+                  選單樣式比照 App 裡 LangSwitcher 的下拉選單質感。
                   選好類型後，對應的輸入框會動態出現在下方（見下面 contacts.map 那一段）。 */}
               <div className="relative" ref={contactMenuRef}>
                 <button
@@ -334,8 +334,7 @@ export default function FeedbackModal({ onClose }) {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold"
                   style={{ border: '1px dashed var(--card-border)', color: INK_SOFT }}
                 >
-                  <Plus size={14} />
-                  添加聯絡方式
+                  新增聯絡方式
                   {availableContactTypes.length > 0 && (
                     <ChevronDown size={14} style={{ transform: contactMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }} />
                   )}
@@ -343,7 +342,7 @@ export default function FeedbackModal({ onClose }) {
                 {contactMenuOpen && availableContactTypes.length > 0 && (
                   <div
                     className="absolute left-0 mt-2 rounded-xl overflow-hidden z-20"
-                    style={{ width: 160, background: CARD_BG, backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                    style={{ width: 160, background: CARD_BG, border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
                   >
                     {availableContactTypes.map(ct => (
                       <button
