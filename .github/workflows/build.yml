@@ -88,7 +88,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y imagemagick
           mkdir -p resources
           if [ -f public/icon-512.png ]; then
-            convert public/icon-512.png -resize 105% -gravity center -background none -extent 512x512 resources/icon.png
+            convert public/icon-512.png -resize 107% -gravity center -background none -extent 512x512 resources/icon.png
           else
             echo "Icon not found, skipping."
           fi
