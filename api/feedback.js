@@ -5,6 +5,21 @@ export const config = { runtime: 'edge' };
 // 達成「多圖也能穩定送出、又盡量用相簿效果」的效果。
 const MEDIA_GROUP_MAX = 10;
 
+// 每筆回饋的短碼：時間戳記（base36，取最後 5 碼）+ 4 碼隨機字元，方便在 Telegram 裡肉眼
+// 辨識／引用。這裡老實說清楚它的保證等級：
+// - 時間戳記那 5 碼本質是「目前毫秒數 mod 36^5」，大約每 16.8 小時就會完整繞回重複一次
+//   （這是數學上確定會發生的週期性重複，不是機率問題）。
+// - 只有當兩筆意見剛好落在同一個週期內的同一毫秒送出時，才需要靠後面的隨機字元來避免撞號；
+//   4 碼隨機字元有 36^4 ≈ 168 萬種組合，撞號機率非常低，但不是「保證絕對不重複」。
+// - 這裡完全沒有查資料庫確認是否已存在同樣的碼——單純是「機率夠低到小規模使用不用擔心」，
+//   不是嚴格唯一鍵。之後如果接了 Firestore（見前面的雙向回覆方案），建議直接拿
+//   Firestore 自動產生的 feedbackId（保證唯一）取代這裡的短碼，或送出前先查一次是否重複。
+function generateFeedbackCode() {
+  const time = Date.now().toString(36).toUpperCase().slice(-5);
+  const rand = Math.random().toString(36).toUpperCase().slice(2, 6).padEnd(4, '0');
+  return `FB${time}${rand}`;
+}
+
 async function sendMessage(caption) {
   return fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
     method: 'POST',
@@ -72,7 +87,8 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ ok: false, error: 'Invalid message' }), { status: 400 });
   }
 
-  const caption = `📩 新意見反饋${feedbackType ? `（${feedbackType}）` : ''}\n\n${message}${contact ? `\n\n聯絡方式：${contact}` : ''}`;
+  const feedbackCode = generateFeedbackCode();
+  const caption = `📩 新意見反饋 #${feedbackCode}${feedbackType ? `（${feedbackType}）` : ''}\n\n${message}${contact ? `\n\n聯絡方式：${contact}` : ''}`;
 
   try {
     if (images.length === 0) {
@@ -90,7 +106,7 @@ export default async function handler(req) {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return new Response(JSON.stringify({ ok: true, code: feedbackCode }), { status: 200 });
   } catch (err) {
     return new Response(JSON.stringify({ ok: false, error: 'Failed to send' }), { status: 500 });
   }
