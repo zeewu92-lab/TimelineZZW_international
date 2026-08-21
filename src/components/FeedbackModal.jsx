@@ -54,7 +54,7 @@ const CONTACT_TYPE_LABEL = Object.fromEntries(CONTACT_TYPES.map(c => [c.id, c.la
 // 一律用 getCountryCallingCode() 從 libphonenumber-js 的資料現算，不手動抄一份數字，
 // 避免手抄打錯或跟函式庫本身的校驗規則對不上。這份清單涵蓋常見的地區，之後有需要
 // 隨時可以再往裡加，不影響其他邏輯。
-const RAW_COUNTRIES = [
+const RAW_REGIONS = [
   ['CN', '中國大陸'], ['HK', '香港'], ['MO', '澳門'], ['TW', '台灣'],
   ['US', '美國'], ['CA', '加拿大'], ['JP', '日本'], ['KR', '韓國'],
   ['SG', '新加坡'], ['MY', '馬來西亞'], ['TH', '泰國'], ['VN', '越南'],
@@ -75,11 +75,11 @@ const RAW_COUNTRIES = [
   ['RO', '羅馬尼亞'], ['BG', '保加利亞'], ['HR', '克羅埃西亞'], ['RS', '塞爾維亞'],
   ['SK', '斯洛伐克'], ['SI', '斯洛維尼亞'], ['IS', '冰島'], ['LU', '盧森堡'],
 ];
-const COUNTRIES = RAW_COUNTRIES.map(([code, name]) => ({ code, name, callingCode: getCountryCallingCode(code) }));
+const REGIONS = RAW_REGIONS.map(([code, name]) => ({ code, name, callingCode: getCountryCallingCode(code) }));
 // 最終保底值：時區判斷不到對應國家時才會用到這個（例如瀏覽器回傳了一個不在對照表裡的時區）。
 const DEFAULT_PHONE_COUNTRY = 'CN';
 
-// IANA 時區 -> ISO 國家代碼的對照表，只需要覆蓋 COUNTRIES 清單裡有的國家／地區即可。
+// IANA 時區 -> ISO 國家代碼的對照表，只需要覆蓋 REGIONS 清單裡有的國家／地區即可。
 // 大國（美國／加拿大／俄羅斯／澳洲）境內有多個時區，這裡把常見的都對應到同一個國家代碼；
 // 其餘大多數國家在 Intl 裡通常就只有一個代表時區，一對一列出即可。
 const TIMEZONE_TO_COUNTRY = {
@@ -311,7 +311,18 @@ export default function FeedbackModal({ onClose, isDark = false }) {
   const [images, setImages] = useState([]);
   const [status, setStatus] = useState(''); // '', 'sending', 'success', 'error'
   const [feedbackCode, setFeedbackCode] = useState(''); // 送出成功後後端回傳的短碼，例如 FB8K2N9
-  const [codeCopied, setCodeCopied] = useState(false); // 短暫顯示「已複製」的圖示回饋
+  const [codeCopied, setCodeCopied] = useState(false); // 短暫顯示「已複製」的圖示反饋
+
+  // 送出成功那一刻，表單畫面切換成感謝畫面，這裡讓感謝畫面本身也做一個淡入＋輕微上浮的
+  // 進場動畫（跟外層視窗進場同一套手法：先掛上 DOM/opacity 0，下一個 frame 再切換觸發
+  // CSS transition），不是整個視窗重新開合，只是這塊內容自己的進場效果。
+  const [successEntered, setSuccessEntered] = useState(false);
+  const SUCCESS_ANIM_DURATION = 260;
+  useEffect(() => {
+    if (status !== 'success') { setSuccessEntered(false); return; }
+    const id = requestAnimationFrame(() => setSuccessEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, [status]);
 
   // 複製編號到剪貼簿；navigator.clipboard 在非 https（少數 WebView）環境可能不存在，
   // 用 try/catch 包起來，複製失敗就靜默失敗，不影響其他功能。
@@ -401,22 +412,29 @@ export default function FeedbackModal({ onClose, isDark = false }) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-black" style={{ color: INK }}>意見回饋</h2>
+            <h2 className="text-lg font-black" style={{ color: INK }}>意見反饋</h2>
             <button onClick={handleClose} style={{ color: INK_SOFT }}>
               <X size={20} />
             </button>
           </div>
 
           {status === 'success' ? (
-            <div className="py-6 text-center">
-              <p className="text-base font-black" style={{ color: INK }}>意見回饋提交成功</p>
+            <div
+              className="py-6 text-center"
+              style={{
+                opacity: successEntered ? 1 : 0,
+                transform: successEntered ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.96)',
+                transition: `opacity ${SUCCESS_ANIM_DURATION}ms ease, transform ${SUCCESS_ANIM_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+              }}
+            >
+              <p className="text-2xl font-black" style={{ color: INK }}>提交成功！</p>
               <p className="text-sm mt-3 leading-relaxed" style={{ color: INK }}>
-                感謝您提供寶貴的意見與建議。我們已成功收到您的回饋，相關內容將由我們認真審閱與處理。
+                感謝您提供寶貴的意見與建議。我們已成功收到您的反饋，相關內容將由我們認真審閱與處理。
               </p>
               {feedbackCode && (
                 <div className="flex items-center justify-center gap-1.5 mt-3">
                   <span className="text-sm font-bold" style={{ color: INK }}>
-                    回饋編號：{feedbackCode}
+                    反饋編號：{feedbackCode}
                   </span>
                   <button
                     type="button"
@@ -430,10 +448,10 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                 </div>
               )}
               <p className="text-xs mt-3 leading-relaxed" style={{ color: INK_SOFT }}>
-                請妥善保存此編號，後續與我們聯繫時提供此編號，有助於我們快速確認相關回饋內容。我們也會在必要時透過您提供的聯絡方式與您聯繫。
+                請妥善保存此編號，後續與我們聯繫時提供此編號，有助於我們快速確認相關反饋內容。我們也會在必要時透過您提供的聯絡方式與您聯繫。
               </p>
               <p className="text-xs mt-3 leading-relaxed" style={{ color: INK_SOFT }}>
-                再次感謝您的回饋，您的意見將作為我們持續改善與優化服務的重要參考。
+                再次感謝您的反饋，您的意見將作為我們持續改善與優化服務的重要參考。
               </p>
               <button
                 onClick={handleClose}
@@ -581,13 +599,13 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                     const phoneInvalid =
                       c.type === 'phone' && c.value.trim() !== '' && !isValidPhoneNumber(c.value, c.country || DEFAULT_PHONE_COUNTRY);
                     const phoneCountrySearchLower = phoneCountrySearch.trim().toLowerCase();
-                    const filteredCountries = phoneCountrySearchLower
-                      ? COUNTRIES.filter(ct =>
+                    const filteredRegions = phoneCountrySearchLower
+                      ? REGIONS.filter(ct =>
                           ct.name.toLowerCase().includes(phoneCountrySearchLower) ||
                           ct.code.toLowerCase().includes(phoneCountrySearchLower) ||
                           ct.callingCode.includes(phoneCountrySearchLower.replace('+', ''))
                         )
-                      : COUNTRIES;
+                      : REGIONS;
 
                     return (
                       <div key={c.id} className="flex flex-col gap-1.5">
@@ -640,7 +658,7 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                                       />
                                     </div>
                                     <div className="overflow-y-auto" style={{ maxHeight: 200 }}>
-                                      {filteredCountries.map(ct => (
+                                      {filteredRegions.map(ct => (
                                         <button
                                           key={ct.code}
                                           type="button"
@@ -652,7 +670,7 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                                           <span style={{ color: INK_SOFT }}>+{ct.callingCode}</span>
                                         </button>
                                       ))}
-                                      {filteredCountries.length === 0 && (
+                                      {filteredRegions.length === 0 && (
                                         <p className="px-3 py-4 text-xs text-center" style={{ color: INK_SOFT }}>找不到符合的國家／地區</p>
                                       )}
                                     </div>
@@ -783,7 +801,7 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                 {status === 'sending' ? '傳送中...' : '送出'}
               </button>
 
-              {/* 替代回饋方式：跟表單本身用同一個 flex-col + gap-3 的間距節奏，
+              {/* 替代反饋方式：跟表單本身用同一個 flex-col + gap-3 的間距節奏，
                   不需要額外加 margin，分隔線與下面的 mailto 連結自然融入既有留白。 */}
               <div className="flex items-center gap-3">
                 <div className="flex-1" style={{ height: 1, background: 'var(--card-border)' }} />
