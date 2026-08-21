@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Send, Plus, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Send, Plus, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2, Copy, Check } from 'lucide-react';
 // 手機號碼的國際區號與各國格式校驗，全部交給 libphonenumber-js（Google libphonenumber 的 JS 版本）
 // 處理，不自己刻各國規則表——手動維護兩百多國的號碼長度/格式規則極容易寫錯或漏判，
 // 這正是題目特別提醒「不能誤判合法號碼」的原因。需要先 `npm install libphonenumber-js`。
@@ -311,6 +311,19 @@ export default function FeedbackModal({ onClose, isDark = false }) {
   const [images, setImages] = useState([]);
   const [status, setStatus] = useState(''); // '', 'sending', 'success', 'error'
   const [feedbackCode, setFeedbackCode] = useState(''); // 送出成功後後端回傳的短碼，例如 FB8K2N9
+  const [codeCopied, setCodeCopied] = useState(false); // 短暫顯示「已複製」的圖示回饋
+
+  // 複製編號到剪貼簿；navigator.clipboard 在非 https（少數 WebView）環境可能不存在，
+  // 用 try/catch 包起來，複製失敗就靜默失敗，不影響其他功能。
+  async function copyFeedbackCode() {
+    try {
+      await navigator.clipboard.writeText(feedbackCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1500);
+    } catch {
+      // 複製失敗就算了，不打斷使用者，畫面上編號本來就看得到可以手動抄
+    }
+  }
   const [previewIndex, setPreviewIndex] = useState(null); // 點縮圖後開啟的燈箱，null 表示沒開
   const fileInputRef = useRef(null);
 
@@ -396,12 +409,32 @@ export default function FeedbackModal({ onClose, isDark = false }) {
 
           {status === 'success' ? (
             <div className="py-6 text-center">
-              <p className="text-sm font-bold" style={{ color: INK }}>感謝您的意見！</p>
+              <p className="text-base font-black" style={{ color: INK }}>意見回饋提交成功</p>
+              <p className="text-sm mt-3 leading-relaxed" style={{ color: INK }}>
+                感謝您提供寶貴的意見與建議。我們已成功收到您的回饋，相關內容將由我們認真審閱與處理。
+              </p>
               {feedbackCode && (
-                <p className="text-xs mt-1.5" style={{ color: INK_SOFT }}>
-                  回饋編號 #{feedbackCode}
-                </p>
+                <div className="flex items-center justify-center gap-1.5 mt-3">
+                  <span className="text-sm font-bold" style={{ color: INK }}>
+                    回饋編號：{feedbackCode}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyFeedbackCode}
+                    className="flex items-center justify-center rounded-lg flex-shrink-0"
+                    style={{ width: 24, height: 24, color: codeCopied ? ACCENT : INK_SOFT }}
+                    title="複製編號"
+                  >
+                    {codeCopied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
               )}
+              <p className="text-xs mt-3 leading-relaxed" style={{ color: INK_SOFT }}>
+                請妥善保存此編號，後續與我們聯繫時提供此編號，有助於我們快速確認相關回饋內容。我們也會在必要時透過您提供的聯絡方式與您聯繫。
+              </p>
+              <p className="text-xs mt-3 leading-relaxed" style={{ color: INK_SOFT }}>
+                再次感謝您的回饋，您的意見將作為我們持續改善與優化服務的重要參考。
+              </p>
               <button
                 onClick={handleClose}
                 className="mt-4 px-4 py-2 rounded-xl text-sm font-bold"
@@ -749,6 +782,21 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                 <Send size={14} />
                 {status === 'sending' ? '傳送中...' : '送出'}
               </button>
+
+              {/* 替代回饋方式：跟表單本身用同一個 flex-col + gap-3 的間距節奏，
+                  不需要額外加 margin，分隔線與下面的 mailto 連結自然融入既有留白。 */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1" style={{ height: 1, background: 'var(--card-border)' }} />
+                <span className="flex-shrink-0 text-xs font-bold" style={{ color: INK_SOFT }}>或</span>
+                <div className="flex-1" style={{ height: 1, background: 'var(--card-border)' }} />
+              </div>
+              <a
+                href="mailto:support@timezzw.top"
+                className="block text-center text-sm font-bold active:opacity-70"
+                style={{ color: ACCENT, textDecoration: 'underline', textUnderlineOffset: 3 }}
+              >
+                向我們的電子郵箱傳送郵件
+              </a>
             </form>
           )}
         </div>
