@@ -4148,8 +4148,8 @@ function TimelineSection({
             background: colorHex(ev.colorId),
             left: '-1.375rem',
             top: '0.25rem',
-            border: '3px solid var(--page-bg)',
-            boxShadow: '0 0 0 1px var(--card-border)',
+            border: '0.1875rem solid var(--page-bg)',
+            boxShadow: '0 0 0 0.0625rem var(--card-border)',
             zIndex: 20,
             pointerEvents: 'none',
           }}
