@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Plus, ChevronLeft, ChevronRight, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+// 手機號碼的國際區號與各國格式校驗，全部交給 libphonenumber-js（Google libphonenumber 的 JS 版本）
+// 處理，不自己刻各國規則表——手動維護兩百多國的號碼長度/格式規則極容易寫錯或漏判，
+// 這正是題目特別提醒「不能誤判合法號碼」的原因。需要先 `npm install libphonenumber-js`。
+import { parsePhoneNumberFromString, isValidPhoneNumber, getCountryCallingCode } from 'libphonenumber-js';
 
 const ACCENT = 'var(--accent, #6C7BE0)';
 const INK = 'var(--ink)';
@@ -46,6 +50,101 @@ const CONTACT_TYPES = [
 ];
 const CONTACT_TYPE_LABEL = Object.fromEntries(CONTACT_TYPES.map(c => [c.id, c.label]));
 
+// 國際區號選擇器的可選國家／地區清單：只需要維護 ISO 代碼＋中文名稱，實際的區號（+86 這種）
+// 一律用 getCountryCallingCode() 從 libphonenumber-js 的資料現算，不手動抄一份數字，
+// 避免手抄打錯或跟函式庫本身的校驗規則對不上。這份清單涵蓋常見的地區，之後有需要
+// 隨時可以再往裡加，不影響其他邏輯。
+const RAW_COUNTRIES = [
+  ['CN', '中國大陸'], ['HK', '香港'], ['MO', '澳門'], ['TW', '台灣'],
+  ['US', '美國'], ['CA', '加拿大'], ['JP', '日本'], ['KR', '韓國'],
+  ['SG', '新加坡'], ['MY', '馬來西亞'], ['TH', '泰國'], ['VN', '越南'],
+  ['PH', '菲律賓'], ['ID', '印尼'], ['IN', '印度'], ['GB', '英國'],
+  ['FR', '法國'], ['DE', '德國'], ['IT', '義大利'], ['ES', '西班牙'],
+  ['PT', '葡萄牙'], ['NL', '荷蘭'], ['BE', '比利時'], ['CH', '瑞士'],
+  ['AT', '奧地利'], ['SE', '瑞典'], ['NO', '挪威'], ['DK', '丹麥'],
+  ['FI', '芬蘭'], ['IE', '愛爾蘭'], ['PL', '波蘭'], ['RU', '俄羅斯'],
+  ['UA', '烏克蘭'], ['TR', '土耳其'], ['GR', '希臘'], ['AU', '澳大利亞'],
+  ['NZ', '紐西蘭'], ['AE', '阿聯酋'], ['SA', '沙烏地阿拉伯'], ['IL', '以色列'],
+  ['EG', '埃及'], ['ZA', '南非'], ['NG', '奈及利亞'], ['KE', '肯亞'],
+  ['BR', '巴西'], ['MX', '墨西哥'], ['AR', '阿根廷'], ['CL', '智利'],
+  ['CO', '哥倫比亞'], ['PE', '秘魯'], ['PK', '巴基斯坦'], ['BD', '孟加拉'],
+  ['LK', '斯里蘭卡'], ['NP', '尼泊爾'], ['KH', '柬埔寨'], ['MM', '緬甸'],
+  ['LA', '寮國'], ['MN', '蒙古'], ['KZ', '哈薩克'], ['UZ', '烏茲別克'],
+  ['QA', '卡達'], ['KW', '科威特'], ['OM', '阿曼'], ['JO', '約旦'],
+  ['LB', '黎巴嫩'], ['IQ', '伊拉克'], ['CZ', '捷克'], ['HU', '匈牙利'],
+  ['RO', '羅馬尼亞'], ['BG', '保加利亞'], ['HR', '克羅埃西亞'], ['RS', '塞爾維亞'],
+  ['SK', '斯洛伐克'], ['SI', '斯洛維尼亞'], ['IS', '冰島'], ['LU', '盧森堡'],
+];
+const COUNTRIES = RAW_COUNTRIES.map(([code, name]) => ({ code, name, callingCode: getCountryCallingCode(code) }));
+// 最終保底值：時區判斷不到對應國家時才會用到這個（例如瀏覽器回傳了一個不在對照表裡的時區）。
+const DEFAULT_PHONE_COUNTRY = 'CN';
+
+// IANA 時區 -> ISO 國家代碼的對照表，只需要覆蓋 COUNTRIES 清單裡有的國家／地區即可。
+// 大國（美國／加拿大／俄羅斯／澳洲）境內有多個時區，這裡把常見的都對應到同一個國家代碼；
+// 其餘大多數國家在 Intl 裡通常就只有一個代表時區，一對一列出即可。
+const TIMEZONE_TO_COUNTRY = {
+  'Asia/Shanghai': 'CN', 'Asia/Urumqi': 'CN',
+  'Asia/Hong_Kong': 'HK', 'Asia/Macau': 'MO', 'Asia/Taipei': 'TW',
+  'America/New_York': 'US', 'America/Chicago': 'US', 'America/Denver': 'US',
+  'America/Los_Angeles': 'US', 'America/Anchorage': 'US', 'Pacific/Honolulu': 'US',
+  'America/Toronto': 'CA', 'America/Vancouver': 'CA', 'America/Edmonton': 'CA',
+  'America/Winnipeg': 'CA', 'America/Halifax': 'CA',
+  'Asia/Tokyo': 'JP', 'Asia/Seoul': 'KR', 'Asia/Singapore': 'SG',
+  'Asia/Kuala_Lumpur': 'MY', 'Asia/Bangkok': 'TH', 'Asia/Ho_Chi_Minh': 'VN',
+  'Asia/Manila': 'PH', 'Asia/Jakarta': 'ID', 'Asia/Kolkata': 'IN',
+  'Europe/London': 'GB', 'Europe/Paris': 'FR', 'Europe/Berlin': 'DE',
+  'Europe/Rome': 'IT', 'Europe/Madrid': 'ES', 'Europe/Lisbon': 'PT',
+  'Europe/Amsterdam': 'NL', 'Europe/Brussels': 'BE', 'Europe/Zurich': 'CH',
+  'Europe/Vienna': 'AT', 'Europe/Stockholm': 'SE', 'Europe/Oslo': 'NO',
+  'Europe/Copenhagen': 'DK', 'Europe/Helsinki': 'FI', 'Europe/Dublin': 'IE',
+  'Europe/Warsaw': 'PL', 'Europe/Moscow': 'RU', 'Asia/Yekaterinburg': 'RU',
+  'Asia/Novosibirsk': 'RU', 'Asia/Vladivostok': 'RU', 'Europe/Kyiv': 'UA',
+  'Europe/Istanbul': 'TR', 'Europe/Athens': 'GR',
+  'Australia/Sydney': 'AU', 'Australia/Melbourne': 'AU', 'Australia/Brisbane': 'AU',
+  'Australia/Perth': 'AU', 'Australia/Adelaide': 'AU', 'Pacific/Auckland': 'NZ',
+  'Asia/Dubai': 'AE', 'Asia/Riyadh': 'SA', 'Asia/Jerusalem': 'IL',
+  'Africa/Cairo': 'EG', 'Africa/Johannesburg': 'ZA', 'Africa/Lagos': 'NG', 'Africa/Nairobi': 'KE',
+  'America/Sao_Paulo': 'BR', 'America/Mexico_City': 'MX',
+  'America/Argentina/Buenos_Aires': 'AR', 'America/Santiago': 'CL',
+  'America/Bogota': 'CO', 'America/Lima': 'PE',
+  'Asia/Karachi': 'PK', 'Asia/Dhaka': 'BD', 'Asia/Colombo': 'LK', 'Asia/Kathmandu': 'NP',
+  'Asia/Phnom_Penh': 'KH', 'Asia/Yangon': 'MM', 'Asia/Vientiane': 'LA', 'Asia/Ulaanbaatar': 'MN',
+  'Asia/Almaty': 'KZ', 'Asia/Tashkent': 'UZ', 'Asia/Qatar': 'QA', 'Asia/Kuwait': 'KW',
+  'Asia/Muscat': 'OM', 'Asia/Amman': 'JO', 'Asia/Beirut': 'LB', 'Asia/Baghdad': 'IQ',
+  'Europe/Prague': 'CZ', 'Europe/Budapest': 'HU', 'Europe/Bucharest': 'RO',
+  'Europe/Sofia': 'BG', 'Europe/Zagreb': 'HR', 'Europe/Belgrade': 'RS',
+  'Europe/Bratislava': 'SK', 'Europe/Ljubljana': 'SI',
+  'Atlantic/Reykjavik': 'IS', 'Europe/Luxembourg': 'LU',
+};
+
+// 新增手機號碼聯絡方式時，用瀏覽器/系統目前的時區去猜預設國家／地區（例如系統時區是
+// Asia/Shanghai 就預設 +86、Asia/Tokyo 就預設 +81），對照表裡找不到才退回 DEFAULT_PHONE_COUNTRY。
+// 使用者隨時都可以自己在選單裡改，這裡只是決定「一開始選好的是哪一個」。
+function detectDefaultPhoneCountry() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return TIMEZONE_TO_COUNTRY[tz] || DEFAULT_PHONE_COUNTRY;
+  } catch {
+    return DEFAULT_PHONE_COUNTRY;
+  }
+}
+
+// 失焦時把使用者輸入的號碼重新排版成該國家慣用的格式（例如中國大陸會排成「138 0000 0000」），
+// 對應題目要求的「自動套用相應的號碼格式」；只在 libphonenumber-js 能夠解析出來時才重新排版，
+// 解析不出來就照使用者原本打的樣子留著，讓下面的錯誤提示去處理，不會憑空改動使用者輸入的內容。
+function formatPhoneOnBlur(value, country) {
+  if (!value.trim()) return value;
+  const parsed = parsePhoneNumberFromString(value, country);
+  return parsed ? parsed.formatNational() : value;
+}
+
+// 送出前組成完整國際電話號碼（例如 +86 138 0000 0000）。國際區號跟號碼平常分開存在
+// contact 物件的 country／value 兩個欄位裡，只有在這裡、真的要送出的當下才組合起來。
+function formatPhoneForSubmit(value, country) {
+  const parsed = parsePhoneNumberFromString(value, country);
+  return parsed ? parsed.formatInternational() : `+${getCountryCallingCode(country)} ${value}`;
+}
+
 // 「意見類型」二級選單的可選項目，單選——選了哪個就直接顯示在「意見類型」欄位裡，
 // 跟「新增聯絡方式」那組多選、可重複添加的選單性質不同，所以分開兩組常數與各自的 state。
 const FEEDBACK_TYPES = ['功能建議', '問題回報', '介面與體驗', '效能問題', '帳號與資料', '隱私與安全', '其他'];
@@ -58,6 +157,9 @@ function formatContactsForSubmit(contacts) {
     .map(c => {
       const value = c.value.trim();
       if (!value) return null;
+      if (c.type === 'phone') {
+        return `手機號碼：${formatPhoneForSubmit(value, c.country || DEFAULT_PHONE_COUNTRY)}`;
+      }
       const label = c.type === 'other' ? (c.label.trim() || '其他') : CONTACT_TYPE_LABEL[c.type];
       return `${label}：${value}`;
     })
@@ -113,6 +215,12 @@ export default function FeedbackModal({ onClose, isDark = false }) {
   const CONTACT_MENU_WIDTH = 160;
   const CONTACT_MENU_GAP = 8;
   const contactIdRef = useRef(0);
+  // 國際區號選擇器：「新增聯絡方式」選單已經會擋掉重複加第二筆「手機號碼」，
+  // 所以任何時候最多只會有一筆 type === 'phone' 的聯絡方式，這裡用單一組 state
+  // 就能安全對應到那唯一一筆，不需要用陣列或用 id 分別追蹤每一筆的開合狀態。
+  const [phoneCountryMenuOpen, setPhoneCountryMenuOpen] = useState(false);
+  const [phoneCountrySearch, setPhoneCountrySearch] = useState('');
+  const phoneCountryMenuRef = useRef(null);
 
   // 按 Esc 關閉：哪個選單／放大狀態最後開的就先收合哪個，都沒開才關閉整個視窗，
   // 跟一般「一次 Esc 只收掉最上層那件事」的操作習慣一致。
@@ -121,13 +229,14 @@ export default function FeedbackModal({ onClose, isDark = false }) {
       if (e.key !== 'Escape' && e.key !== 'Esc') return;
       if (feedbackTypeMenuOpen) setFeedbackTypeMenuOpen(false);
       else if (contactMenuOpen) setContactMenuOpen(false);
+      else if (phoneCountryMenuOpen) { setPhoneCountryMenuOpen(false); setPhoneCountrySearch(''); }
       else if (messageExpanded) setMessageExpanded(false);
       else handleClose();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedbackTypeMenuOpen, contactMenuOpen, messageExpanded]);
+  }, [feedbackTypeMenuOpen, contactMenuOpen, phoneCountryMenuOpen, messageExpanded]);
 
   // 點選單外面的地方就收合「意見類型」選單
   useEffect(() => {
@@ -149,6 +258,19 @@ export default function FeedbackModal({ onClose, isDark = false }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [contactMenuOpen]);
 
+  // 點選單外面的地方就收合國際區號選擇器（順便清掉搜尋字串，下次打開是乾淨的狀態）
+  useEffect(() => {
+    if (!phoneCountryMenuOpen) return;
+    function handleClickOutside(e) {
+      if (phoneCountryMenuRef.current && !phoneCountryMenuRef.current.contains(e.target)) {
+        setPhoneCountryMenuOpen(false);
+        setPhoneCountrySearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [phoneCountryMenuOpen]);
+
   // 已加入的類型（'其他' 除外）就不再顯示在選單裡，避免使用者不小心重複加兩個 WeChat；
   // 「其他」允許加很多個（例如同時想留 Line 跟 Signal），所以不受這個限制。
   const usedTypes = new Set(contacts.filter(c => c.type !== 'other').map(c => c.type));
@@ -156,7 +278,10 @@ export default function FeedbackModal({ onClose, isDark = false }) {
 
   function addContact(typeId) {
     contactIdRef.current += 1;
-    setContacts(prev => [...prev, { id: contactIdRef.current, type: typeId, label: '', value: '' }]);
+    // 手機號碼類型多帶一個 country 欄位，預設值改成依系統時區偵測（偵測不到才退回 +86）；
+    // 其餘類型不需要這個欄位，維持原樣。
+    const extra = typeId === 'phone' ? { country: detectDefaultPhoneCountry() } : {};
+    setContacts(prev => [...prev, { id: contactIdRef.current, type: typeId, label: '', value: '', ...extra }]);
     setContactMenuOpen(false);
   }
 
@@ -412,59 +537,150 @@ export default function FeedbackModal({ onClose, isDark = false }) {
                 )}
               </div>
 
-              {/* 已加入的聯絡方式：每一筆都是可直接編輯的輸入框＋刪除按鈕，
-                  '其他' 額外多一個「名稱」輸入框讓使用者自訂顯示文字。 */}
+              {/* 已加入的聯絡方式：每一筆都是可直接編輯的輸入框＋刪除按鈕。
+                  '其他' 多一個「名稱」輸入框；'phone'（手機號碼）多一個國際區號選擇器，
+                  格式與校驗規則都交給 libphonenumber-js，依所選國家／地區動態套用。 */}
               {contacts.length > 0 && (
                 <div className="flex flex-col gap-2">
-                  {contacts.map(c => (
-                    <div key={c.id} className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="flex-shrink-0 text-xs font-bold px-2 py-2 rounded-xl text-center"
-                          style={{ background: INPUT_BG, color: INK_SOFT, minWidth: 64 }}
-                        >
-                          {CONTACT_TYPE_LABEL[c.type]}
-                        </span>
-                        {c.type === 'other' ? (
+                  {contacts.map(c => {
+                    // 手機號碼：只有在使用者實際輸入過內容、且格式不符合所選國家／地區規則時才顯示錯誤，
+                    // 純視覺提醒，不會擋住送出（跟上面「意見內容」字數統計同一套不強制阻擋的邏輯）。
+                    const phoneInvalid =
+                      c.type === 'phone' && c.value.trim() !== '' && !isValidPhoneNumber(c.value, c.country || DEFAULT_PHONE_COUNTRY);
+                    const phoneCountrySearchLower = phoneCountrySearch.trim().toLowerCase();
+                    const filteredCountries = phoneCountrySearchLower
+                      ? COUNTRIES.filter(ct =>
+                          ct.name.toLowerCase().includes(phoneCountrySearchLower) ||
+                          ct.code.toLowerCase().includes(phoneCountrySearchLower) ||
+                          ct.callingCode.includes(phoneCountrySearchLower.replace('+', ''))
+                        )
+                      : COUNTRIES;
+
+                    return (
+                      <div key={c.id} className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="flex-shrink-0 text-xs font-bold px-2 py-2 rounded-xl text-center"
+                            style={{ background: INPUT_BG, color: INK_SOFT, minWidth: 64 }}
+                          >
+                            {CONTACT_TYPE_LABEL[c.type]}
+                          </span>
+
+                          {c.type === 'other' ? (
+                            <input
+                              type="text"
+                              value={c.label}
+                              onChange={(e) => updateContact(c.id, { label: e.target.value })}
+                              placeholder="名稱，如 Line"
+                              className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
+                              style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                            />
+                          ) : c.type === 'phone' ? (
+                            <>
+                              {/* 國際區號選擇器：點擊展開可搜尋的國家／地區清單，選好之後只收合選單、
+                                  不影響已經輸入的號碼本身——國際區號跟號碼分開存在 country／value 兩個
+                                  欄位，送出時才由 formatPhoneForSubmit 組成完整國際電話號碼。 */}
+                              <div className="relative" ref={phoneCountryMenuRef}>
+                                <button
+                                  type="button"
+                                  onClick={() => setPhoneCountryMenuOpen(v => !v)}
+                                  className="flex items-center gap-1 px-2 py-2 rounded-xl text-sm flex-shrink-0"
+                                  style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                                >
+                                  <span>+{getCountryCallingCode(c.country || DEFAULT_PHONE_COUNTRY)}</span>
+                                  <ChevronDown size={12} style={{ color: INK_SOFT, transform: phoneCountryMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }} />
+                                </button>
+                                {phoneCountryMenuOpen && (
+                                  <div
+                                    className="absolute left-0 top-full mt-2 rounded-xl overflow-hidden z-30 flex flex-col"
+                                    style={{ width: 220, background: DROPDOWN_BG, backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', border: DROPDOWN_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.22)' }}
+                                  >
+                                    <div className="p-2" style={{ borderBottom: DROPDOWN_BORDER }}>
+                                      <input
+                                        type="text"
+                                        value={phoneCountrySearch}
+                                        onChange={(e) => setPhoneCountrySearch(e.target.value)}
+                                        placeholder="搜尋國家／地區或區號"
+                                        autoFocus
+                                        className="w-full rounded-lg px-2 py-1.5 text-xs outline-none"
+                                        style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                                      />
+                                    </div>
+                                    <div className="overflow-y-auto" style={{ maxHeight: 200 }}>
+                                      {filteredCountries.map(ct => (
+                                        <button
+                                          key={ct.code}
+                                          type="button"
+                                          onClick={() => { updateContact(c.id, { country: ct.code }); setPhoneCountryMenuOpen(false); setPhoneCountrySearch(''); }}
+                                          className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm"
+                                          style={{ color: ct.code === c.country ? ACCENT : DROPDOWN_INK, background: ct.code === c.country ? DROPDOWN_ITEM_SELECTED_BG : 'transparent' }}
+                                        >
+                                          <span className="flex-1 truncate">{ct.name}</span>
+                                          <span style={{ color: INK_SOFT }}>+{ct.callingCode}</span>
+                                        </button>
+                                      ))}
+                                      {filteredCountries.length === 0 && (
+                                        <p className="px-3 py-4 text-xs text-center" style={{ color: INK_SOFT }}>找不到符合的國家／地區</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1" />
+                            </>
+                          ) : (
+                            <input
+                              type={CONTACT_TYPES.find(t => t.id === c.type)?.inputType || 'text'}
+                              value={c.value}
+                              onChange={(e) => updateContact(c.id, { value: e.target.value })}
+                              placeholder={CONTACT_TYPES.find(t => t.id === c.type)?.placeholder}
+                              className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
+                              style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                            />
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => removeContact(c.id)}
+                            className="flex-shrink-0 flex items-center justify-center rounded-full"
+                            style={{ width: 26, height: 26, color: INK_SOFT }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+
+                        {c.type === 'other' && (
                           <input
                             type="text"
-                            value={c.label}
-                            onChange={(e) => updateContact(c.id, { label: e.target.value })}
-                            placeholder="名稱，如 Line"
-                            className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
-                            style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
-                          />
-                        ) : (
-                          <input
-                            type={CONTACT_TYPES.find(t => t.id === c.type)?.inputType || 'text'}
                             value={c.value}
                             onChange={(e) => updateContact(c.id, { value: e.target.value })}
-                            placeholder={CONTACT_TYPES.find(t => t.id === c.type)?.placeholder}
-                            className="flex-1 min-w-0 rounded-xl px-3 py-2 text-sm outline-none"
-                            style={{ background: INPUT_BG, color: INK, border: CARD_BORDER }}
+                            placeholder="聯絡資訊"
+                            className="rounded-xl px-3 py-2 text-sm outline-none"
+                            style={{ marginLeft: 72, background: INPUT_BG, color: INK, border: CARD_BORDER }}
                           />
                         )}
-                        <button
-                          type="button"
-                          onClick={() => removeContact(c.id)}
-                          className="flex-shrink-0 flex items-center justify-center rounded-full"
-                          style={{ width: 26, height: 26, color: INK_SOFT }}
-                        >
-                          <X size={14} />
-                        </button>
+
+                        {c.type === 'phone' && (
+                          <>
+                            <input
+                              type="tel"
+                              value={c.value}
+                              onChange={(e) => updateContact(c.id, { value: e.target.value })}
+                              onBlur={(e) => updateContact(c.id, { value: formatPhoneOnBlur(e.target.value, c.country || DEFAULT_PHONE_COUNTRY) })}
+                              placeholder="手機號碼"
+                              className="rounded-xl px-3 py-2 text-sm outline-none"
+                              style={{ marginLeft: 72, background: INPUT_BG, color: INK, border: phoneInvalid ? `1px solid ${DANGER}` : CARD_BORDER }}
+                            />
+                            {phoneInvalid && (
+                              <p className="text-xs" style={{ marginLeft: 72, color: DANGER }}>
+                                請輸入有效的手機號碼
+                              </p>
+                            )}
+                          </>
+                        )}
                       </div>
-                      {c.type === 'other' && (
-                        <input
-                          type="text"
-                          value={c.value}
-                          onChange={(e) => updateContact(c.id, { value: e.target.value })}
-                          placeholder="聯絡資訊"
-                          className="rounded-xl px-3 py-2 text-sm outline-none"
-                          style={{ marginLeft: 72, background: INPUT_BG, color: INK, border: CARD_BORDER }}
-                        />
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
