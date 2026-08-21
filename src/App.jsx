@@ -1605,7 +1605,7 @@ function NotifySettingsButton({ enabled, onToggle, daysBefore, setDaysBefore, pe
         aria-label={t.notifyButtonLabel}
         title={t.notifyButtonLabel}
         className="flex items-center justify-center rounded-full flex-shrink-0"
-        style={{ ...glass(), width: 34, height: 34, color: enabled ? ACCENT : INK }}
+        style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: enabled ? ACCENT : INK }}
       >
         {enabled ? <Bell size={16} /> : <BellOff size={16} />}
       </button>
@@ -2107,8 +2107,8 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzI
       <div className="pb-1.5">
         <div className="flex items-center justify-between mb-1.5 pt-1">
           <div className="flex items-center gap-2">
-            <Clock size={18} style={{ color: ACCENT }} />
-            <h2 className="font-bold" style={{ color: INK, fontSize: 18 }}>{t.worldClock}</h2>
+            <Clock size="1.125rem" style={{ color: ACCENT }} />
+            <h2 className="font-bold" style={{ color: INK, fontSize: '1.125rem' }}>{t.worldClock}</h2>
           </div>
 
           {selectMode ? (
@@ -3297,7 +3297,7 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
               aria-label={t.exportLabel}
               title={t.exportLabel}
               className="p-2 rounded-lg flex items-center justify-center flex-shrink-0 ml-auto"
-              style={{ background: showExportPanel ? ACCENT : 'var(--card-border)', color: showExportPanel ? '#fff' : cardInkSoft, width: 36, height: 36 }}
+              style={{ background: showExportPanel ? ACCENT : 'var(--card-border)', color: showExportPanel ? '#fff' : cardInkSoft, width: '2.25rem', height: '2.25rem' }}
             >
               <Share2 size={15} />
             </button>
@@ -3343,7 +3343,7 @@ function LandmarkDetailModal({ ev, lang, t, isDark, onClose, onSetBgImage, onSet
                       aria-label={t.adjustBgOpacity}
                       title={t.adjustBgOpacity}
                       className="p-2 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: showOpacityAdjust ? ACCENT : 'var(--card-border)', color: showOpacityAdjust ? '#fff' : cardInkSoft, width: 36, height: 36 }}
+                      style={{ background: showOpacityAdjust ? ACCENT : 'var(--card-border)', color: showOpacityAdjust ? '#fff' : cardInkSoft, width: '2.25rem', height: '2.25rem' }}
                     >
                       <SlidersHorizontal size={15} />
                     </button>
@@ -4238,14 +4238,14 @@ function TimelineSection({
         onPointerCancel={() => onHeaderDragEnd && onHeaderDragEnd()}
       >
         <div className="flex items-center gap-2">
-          <MapPin size={18} style={{ color: MINT }} />
-          <h2 className="font-bold" style={{ color: INK, fontSize: 18 }}>{t.timeline}</h2>
+          <MapPin size="1.125rem" style={{ color: MINT }} />
+          <h2 className="font-bold" style={{ color: INK, fontSize: '1.125rem' }}>{t.timeline}</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSearchOpen(v => { const next = !v; if (!next) setSearchQuery(''); return next; })}
             className="flex items-center justify-center rounded-full flex-shrink-0"
-            style={{ ...glass(), width: 30, height: 30, color: searchOpen ? MINT : INK }}
+            style={{ ...glass(), width: '1.875rem', height: '1.875rem', color: searchOpen ? MINT : INK }}
           >
             <Search size={14} />
           </button>
@@ -4447,7 +4447,7 @@ function TimelineSection({
                         type="button"
                         onClick={() => setIcon(i)}
                         className="rounded-lg text-xl flex items-center justify-center relative"
-                        style={{ ...iconPickStyle(icon === i), width: 36, height: 36 }}
+                        style={{ ...iconPickStyle(icon === i), width: '2.25rem', height: '2.25rem' }}
                       >
                         {i}
                       </button>
@@ -4476,7 +4476,7 @@ function TimelineSection({
                         onClick={() => { setShowCustomIconPanel(v => !v); setCustomIconError(''); }}
                         aria-label={t.customIconLabel}
                         className="p-2 rounded-lg text-xl flex items-center justify-center"
-                        style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: 36, height: 36 }}
+                        style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: '2.25rem', height: '2.25rem' }}
                       >
                         <Plus size={16} style={{ color: INK_SOFT }} />
                       </button>
@@ -4538,7 +4538,7 @@ function TimelineSection({
                     onClick={() => { setShowCustomIconPanel(v => !v); setCustomIconError(''); }}
                     aria-label={t.customIconLabel}
                     className="p-2 rounded-lg text-xl flex items-center justify-center"
-                    style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: 36, height: 36 }}
+                    style={{ ...iconPickStyle(showCustomIconPanel, { border: CARD_BORDER }), width: '2.25rem', height: '2.25rem' }}
                   >
                     <Plus size={16} style={{ color: INK_SOFT }} />
                   </button>
@@ -7059,6 +7059,9 @@ export default function App() {
   // （rem 縮放）達成相同視覺效果。Tailwind 的 padding／gap／字級絕大多數都是 rem 為單位，
   // 改根字級會讓整體排版等比例縮小。上面時間軸圓點指示器原本用寫死的 px 值定位（left: -25），
   // 沒有跟著 rem 一起縮放才會跟軸線對不齊；已經把那處改成 rem，這裡才能放心重新套用縮放。
+  // 同樣道理，header 的帳號／通知／深色模式切換按鈕、icon 選擇面板、匯出面板的切換按鈕，
+  // 原本也是用寫死的 width/height px 值（34、36、30），縮放後跟旁邊已經一起縮小的文字、
+  // 圖示比例對不上，看起來比其他內容都大一圈——已經一併改成 rem，全部統一跟著縮放。
   // 只在 App 環境套用；網頁版／PWA 完全不受影響，繼續用自己的 viewport 設定。
   useEffect(() => {
     if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
@@ -7240,7 +7243,7 @@ export default function App() {
             <button
               onClick={() => setShowAuthModal(true)}
               className="relative flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: 34, height: 34, color: fbUser ? MINT : INK }}
+              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: fbUser ? MINT : INK }}
               title={
                 localSaveError || syncStatus === 'error'
                   ? t.syncErrorHint
@@ -7268,7 +7271,7 @@ export default function App() {
             <button
               onClick={() => setShowFeedbackModal(true)}
               className="flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: 34, height: 34, color: INK }}
+              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
               title="意見回饋"
             >
               <Mail size={16} />
@@ -7276,7 +7279,7 @@ export default function App() {
             <button
               onClick={() => setIsDark(v => !v)}
               className="flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: 34, height: 34, color: INK }}
+              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
             >
               {isDark ? <Sun size={16} /> : <Moon size={16} />}
             </button>
