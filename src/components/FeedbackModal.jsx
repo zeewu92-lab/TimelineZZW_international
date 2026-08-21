@@ -7,7 +7,6 @@ const INK = 'var(--ink)';
 const INK_SOFT = 'var(--ink-soft)';
 const CARD_BORDER = '1px solid var(--card-border)';
 const INPUT_BG = 'var(--input-bg)';
-const CARD_BG = 'var(--card-bg)';
 const DANGER = '#FF004A';
 
 // 跟 AuthModal 用的是同一組玻璃感視窗樣式（毛玻璃卡片 + 半透明白底），
@@ -66,7 +65,18 @@ function formatContactsForSubmit(contacts) {
     .join('\n');
 }
 
-export default function FeedbackModal({ onClose }) {
+export default function FeedbackModal({ onClose, isDark = false }) {
+  // 這個彈窗是用 createPortal 直接掛到 document.body（見檔案最下方），在 DOM 樹裡
+  // 跟 App 裡設定 --ink／--card-bg 等 CSS 變數的 #app-root 是手足關係、不是子孫，
+  // 繼承不到那些變數（跟 App.jsx 開頭註解說明的其他幾個 portal 彈窗是同樣的狀況）。
+  // 所以這裡兩個二級選單需要精準區分深/淺色的視覺（玻璃底色、邊框、文字），
+  // 就直接用 isDark 這個 prop 算出對應色票，不依賴會被斷開繼承的 CSS 變數。
+  // 呼叫端記得傳入 isDark={isDark}，沒傳的話預設為淺色模式，不會壞掉但深色模式下配色會不準。
+  const DROPDOWN_BG = isDark ? 'rgba(29,32,41,0.94)' : 'rgba(255,255,255,0.94)';
+  const DROPDOWN_BORDER = isDark ? '1px solid #2B2F3A' : '1px solid #ECEDF1';
+  const DROPDOWN_INK = isDark ? '#F2F3F6' : '#232733';
+  const DROPDOWN_ITEM_SELECTED_BG = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(35,39,51,0.05)';
+
   // 進場／離場動畫：跟 AuthModal 同一套手法——先掛上 DOM（opacity 0 / 背景透明），
   // 下一個 frame 再切成 'shown' 觸發 CSS transition，讓背景淡入、卡片浮現；
   // 關閉時反過來先切 'closing' 播完動畫，再真的呼叫 onClose 把節點卸載。
@@ -95,7 +105,13 @@ export default function FeedbackModal({ onClose }) {
   // （使用者自訂的名稱，例如「Line」），其餘類型的顯示名稱直接查 CONTACT_TYPE_LABEL。
   const [contacts, setContacts] = useState([]);
   const [contactMenuOpen, setContactMenuOpen] = useState(false);
+  // 選單展開方向：'right'（按鈕右側，優先）／'left'（右側空間不夠就改左側）／
+  // 'below'（左右都放不下才退回往下展開的保底方案）。開啟當下量一次可用空間再決定，
+  // 不用一直監聽 resize——彈窗開著的當下使用者不太會去轉螢幕方向。
+  const [contactMenuPlacement, setContactMenuPlacement] = useState('right');
   const contactMenuRef = useRef(null);
+  const CONTACT_MENU_WIDTH = 160;
+  const CONTACT_MENU_GAP = 8;
   const contactIdRef = useRef(0);
 
   // 按 Esc 關閉：哪個選單／放大狀態最後開的就先收合哪個，都沒開才關閉整個視窗，
@@ -151,10 +167,25 @@ export default function FeedbackModal({ onClose }) {
   function removeContact(id) {
     setContacts(prev => prev.filter(c => c.id !== id));
   }
+
+  // 開啟選單當下量一次按鈕跟螢幕邊界的距離，優先往右展開；右側放不下改左側；
+  // 兩側都放不下（極窄螢幕）才退回往下展開，並保留原本的「不超出螢幕邊界」保底。
+  function toggleContactMenu() {
+    if (!contactMenuOpen && contactMenuRef.current) {
+      const rect = contactMenuRef.current.getBoundingClientRect();
+      const spaceRight = window.innerWidth - rect.right;
+      const spaceLeft = rect.left;
+      if (spaceRight >= CONTACT_MENU_WIDTH + CONTACT_MENU_GAP) setContactMenuPlacement('right');
+      else if (spaceLeft >= CONTACT_MENU_WIDTH + CONTACT_MENU_GAP) setContactMenuPlacement('left');
+      else setContactMenuPlacement('below');
+    }
+    setContactMenuOpen(v => !v);
+  }
   // 多圖：每張存 { file, url }，url 是 URL.createObjectURL 產生的本機預覽網址，
   // 卸載或移除圖片時要記得 revoke，不然分頁開久了會累積記憶體。
   const [images, setImages] = useState([]);
   const [status, setStatus] = useState(''); // '', 'sending', 'success', 'error'
+  const [feedbackCode, setFeedbackCode] = useState(''); // 送出成功後後端回傳的短碼，例如 FB8K2N9
   const [previewIndex, setPreviewIndex] = useState(null); // 點縮圖後開啟的燈箱，null 表示沒開
   const fileInputRef = useRef(null);
 
@@ -204,6 +235,7 @@ export default function FeedbackModal({ onClose }) {
       const res = await fetch('/api/feedback', { method: 'POST', body: formData });
       const data = await res.json();
       setStatus(data.ok ? 'success' : 'error');
+      if (data.ok && data.code) setFeedbackCode(data.code);
     } catch {
       setStatus('error');
     }
@@ -240,6 +272,11 @@ export default function FeedbackModal({ onClose }) {
           {status === 'success' ? (
             <div className="py-6 text-center">
               <p className="text-sm font-bold" style={{ color: INK }}>感謝您的意見！</p>
+              {feedbackCode && (
+                <p className="text-xs mt-1.5" style={{ color: INK_SOFT }}>
+                  回饋編號 #{feedbackCode}
+                </p>
+              )}
               <button
                 onClick={handleClose}
                 className="mt-4 px-4 py-2 rounded-xl text-sm font-bold"
@@ -266,7 +303,13 @@ export default function FeedbackModal({ onClose }) {
                 {feedbackTypeMenuOpen && (
                   <div
                     className="absolute left-0 right-0 mt-2 rounded-xl overflow-hidden z-20"
-                    style={{ background: CARD_BG, border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                    style={{
+                      background: DROPDOWN_BG,
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      border: DROPDOWN_BORDER,
+                      boxShadow: '0 10px 30px rgba(35,39,51,0.22)',
+                    }}
                   >
                     {FEEDBACK_TYPES.map(ft => (
                       <button
@@ -274,7 +317,7 @@ export default function FeedbackModal({ onClose }) {
                         type="button"
                         onClick={() => { setFeedbackType(ft); setFeedbackTypeMenuOpen(false); }}
                         className="w-full text-left px-3 py-2 text-sm"
-                        style={{ color: ft === feedbackType ? ACCENT : INK, background: ft === feedbackType ? 'var(--card-border)' : 'transparent' }}
+                        style={{ color: ft === feedbackType ? ACCENT : DROPDOWN_INK, background: ft === feedbackType ? DROPDOWN_ITEM_SELECTED_BG : 'transparent' }}
                       >
                         {ft}
                       </button>
@@ -324,13 +367,13 @@ export default function FeedbackModal({ onClose }) {
                   {messageExpanded ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
                 </button>
               </div>
-              {/* 「新增聯絡方式」按鈕＋二級選單：按鈕本身沿用虛線樣式語彙的橫向文字按鈕；
-                  選單樣式比照 App 裡 LangSwitcher 的下拉選單質感。
+              {/* 「新增聯絡方式」按鈕＋二級選單：self-start 讓按鈕維持原本的緊湊寬度（不像
+                  textarea／意見類型欄位撐滿整列），右側才會有空間讓選單往右展開。
                   選好類型後，對應的輸入框會動態出現在下方（見下面 contacts.map 那一段）。 */}
-              <div className="relative" ref={contactMenuRef}>
+              <div className="relative self-start" ref={contactMenuRef}>
                 <button
                   type="button"
-                  onClick={() => setContactMenuOpen(v => !v)}
+                  onClick={toggleContactMenu}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold"
                   style={{ border: '1px dashed var(--card-border)', color: INK_SOFT }}
                 >
@@ -341,8 +384,18 @@ export default function FeedbackModal({ onClose }) {
                 </button>
                 {contactMenuOpen && availableContactTypes.length > 0 && (
                   <div
-                    className="absolute left-0 mt-2 rounded-xl overflow-hidden z-20"
-                    style={{ width: 160, background: CARD_BG, border: CARD_BORDER, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}
+                    className="absolute rounded-xl overflow-hidden z-20"
+                    style={{
+                      width: CONTACT_MENU_WIDTH,
+                      top: contactMenuPlacement === 'below' ? 'calc(100% + 8px)' : 0,
+                      left: contactMenuPlacement === 'right' ? 'calc(100% + 8px)' : (contactMenuPlacement === 'below' ? 0 : 'auto'),
+                      right: contactMenuPlacement === 'left' ? 'calc(100% + 8px)' : 'auto',
+                      background: DROPDOWN_BG,
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      border: DROPDOWN_BORDER,
+                      boxShadow: '0 10px 30px rgba(35,39,51,0.22)',
+                    }}
                   >
                     {availableContactTypes.map(ct => (
                       <button
@@ -350,7 +403,7 @@ export default function FeedbackModal({ onClose }) {
                         type="button"
                         onClick={() => addContact(ct.id)}
                         className="w-full text-left px-3 py-2 text-sm"
-                        style={{ color: INK }}
+                        style={{ color: DROPDOWN_INK }}
                       >
                         {ct.label}
                       </button>
