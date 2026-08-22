@@ -1694,13 +1694,11 @@ function Flag({ flag, className, style }) {
   return <span className={className} style={style}>{flag}</span>;
 }
 
-function ClockRow({ clock, now, selectMode, selected, onLongPress, onTap, lang, t, compact, isHome, homeTz, hero, onOpenClockModal }) {
+function ClockRow({ clock, now, selectMode, selected, onLongPress, onTap, lang, t, compact, isHome, homeTz, hero }) {
   const timerRef = useRef(null);
   const firedRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
-  const dblTapRef = useRef(null);
   const LONG_PRESS_MOVE_THRESHOLD = 10; // px：手指/滑鼠移動超過這個距離就視為在捲動或拖曳，不算「按住不動」
-  const DOUBLE_TAP_DELAY = 280; // ms：兩次點擊間隔在這個時間內視為雙擊/雙點
   const start = (e) => {
     firedRef.current = false;
     const point = e.touches ? e.touches[0] : e;
@@ -1717,27 +1715,14 @@ function ClockRow({ clock, now, selectMode, selected, onLongPress, onTap, lang, 
     const dy = point.clientY - startPosRef.current.y;
     if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_THRESHOLD) clear();
   };
-  // 只有「目前位置」卡片（hero）才需要分辨單擊（設為/取消目前位置）跟雙擊（開啟時鐘視窗）。
-  // 手機上的 touch tap 也會觸發瀏覽器合成的 click 事件，所以這裡統一用 click 事件本身
-  // 記錄「上一次點擊時間」來判斷雙擊，同時支援滑鼠雙擊與手指快速點兩下。
+  // 原本「目前位置」卡片（hero）雙擊會另外開一個時鐘詳情彈窗，這個互動已經移除——
+  // 該視窗的內容現在直接常駐顯示在「世界時鐘」分頁裡（見 App() 裡 activeTab === 'clock'
+  // 那段），不需要再靠雙擊才看得到，所以這裡跟其他時鐘列一樣，單擊一律直接呼叫 onTap
+  // （hero 卡片的 onTap＝設為/取消目前位置）。
   const handleClick = () => {
     if (firedRef.current) { firedRef.current = false; return; }
-    if (hero && onOpenClockModal) {
-      if (dblTapRef.current) {
-        clearTimeout(dblTapRef.current);
-        dblTapRef.current = null;
-        onOpenClockModal(clock.id);
-        return;
-      }
-      dblTapRef.current = setTimeout(() => {
-        dblTapRef.current = null;
-        onTap(clock.id);
-      }, DOUBLE_TAP_DELAY);
-      return;
-    }
     onTap(clock.id);
   };
-  useEffect(() => () => { if (dblTapRef.current) clearTimeout(dblTapRef.current); }, []);
 
   const country = COUNTRIES.find(c => c.id === clock.countryId);
   const zone = country ? country.zones.find(z => z.tz === clock.tz) : null;
@@ -1971,7 +1956,10 @@ function CurrentLocationClockModal({ clock, now, restClocks, lang, t, onClose, d
     setPhase('closing');
     setTimeout(onClose, CLOSE_DURATION);
   }
-  useModalBackClose(true, handleClose);
+  // dock 模式是常駐在頁面上的內容，不是彈窗，不該劫持返回鍵——不然按返回鍵只會讓這塊內容
+  // 自己播一次「關閉動畫」卻沒有東西真的關掉（onClose 在 dock 模式下通常是空函式），
+  // 使用者會覺得畫面卡住。只有真正的彈窗模式才需要返回鍵＝關閉這個行為。
+  useModalBackClose(!dock, handleClose);
   const shown = phase === 'shown';
 
   return (
@@ -2002,7 +1990,10 @@ function CurrentLocationClockModal({ clock, now, restClocks, lang, t, onClose, d
           <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: ACCENT }}>
             📍{t.currentLocation}
           </span>
-          <button onClick={handleClose} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+          {/* dock 模式＝常駐在頁面上的內容，不是可以關掉的彈窗，這裡就不需要叉叉關閉按鈕了 */}
+          {!dock && (
+            <button onClick={handleClose} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 mt-1">
@@ -2051,7 +2042,7 @@ function CurrentLocationClockModal({ clock, now, restClocks, lang, t, onClose, d
   );
 }
 
-function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzId, setHomeTzId, part2Ref, part2Height, isDraggingWorldClock, isLargeScreen = false, unlimitedHeight = false, clockModalOpen, setClockModalOpen }) {
+function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzId, setHomeTzId, part2Ref, part2Height, isDraggingWorldClock, isLargeScreen = false, unlimitedHeight = false }) {
   const [now, setNow] = useState(new Date());
   const [showMenu, setShowMenu] = useState(false);
   const [submenuCountry, setSubmenuCountry] = useState(null);
@@ -2062,9 +2053,9 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzI
   // 「目前位置」設定的是哪一筆時鐘（id）：改由上層 App 提供／持久化（見 HOME_TZ_ID_KEY），
   // 這個元件重新掛載（例如整頁重新整理）後才不會回復成沒設定的原狀
   //
-  // 「目前位置時鐘詳情」開關本身也改由上層 App 持有（clockModalOpen／setClockModalOpen），
-  // 而不是這裡自己 useState：大屏分欄模式下，這個視窗不再是蓋在畫面正中央的彈窗，
-  // 而是要嵌進右側面板顯示，App 需要知道「現在該不該顯示」才能決定右側面板放什麼內容。
+  // 「目前位置時鐘詳情」（原本雙擊 hero 卡片才會跳出的視窗）已經不再由這個元件負責開關，
+  // 那個視窗的內容現在直接常駐顯示在「世界時鐘」分頁本身（見 App() 裡 activeTab === 'clock'
+  // 那段，用 CurrentLocationClockModal 的 dock 模式渲染），這裡不用再持有任何開關狀態。
   const menuRef = useRef(null);
 
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
@@ -2113,7 +2104,6 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzI
     setSelected([]);
   }
   function cancelSelect() { setSelectMode(false); setSelected([]); }
-  function openClockModal() { setClockModalOpen(true); }
 
   const rootOptions = COUNTRIES.filter(c => !c.zones.every(z => addedTz.has(z.tz)));
   const subOptions = submenuCountry ? submenuCountry.zones.filter(z => !addedTz.has(z.tz)) : [];
@@ -2201,19 +2191,9 @@ function WorldClockSection({ clocks, setClocks, lang, t, onHomeTzChange, homeTzI
             selectMode={selectMode} selected={selected.includes(homeClock.id)}
             onLongPress={longPress} onTap={tap} lang={lang} t={t}
             hero isHome homeTz={homeClock.tz}
-            onOpenClockModal={openClockModal}
           />
         )}
       </div>
-
-      {/* 「目前位置時鐘詳情」視窗：不分手機或大屏，一律用同一種置中彈窗樣式顯示 */}
-      {clockModalOpen && homeClock && (
-        <CurrentLocationClockModal
-          clock={homeClock} now={now} lang={lang} t={t}
-          restClocks={restClocks}
-          onClose={() => setClockModalOpen(false)}
-        />
-      )}
 
       {/* Part 2：其餘時區列表（以及尚未設定「目前位置」時的提示文字）。高度預設有上限（依畫面高度換算），
           時區加再多也不會把下面的時間軸推出畫面——超過上限的部份改成在這個範圍內自行上下捲動查看。
@@ -6594,13 +6574,14 @@ async function saveCloudDataBestEffort(uid, fullData) {
 }
 
 /* ---------------- 底部導覽列（手機版專用，桌面/大屏維持原本左右分欄，不套用這個） ---------------- */
-// 五個分頁固定順序：世界時鐘｜時光線｜紀念日｜圖片庫｜我的。中央「時光線」用品牌圖示
+// 五個分頁固定順序：世界時鐘｜紀念日｜時光線｜圖片庫｜我的——「時光線」放在 5 個項目的正中間
+// （第 3 個），「紀念日」讓到第 2 個。中央「時光線」用品牌圖示
 // （見 BOTTOM_NAV_LOGO_SRC 常數說明），其餘四個用 lucide-react 的簡潔線性圖示，
 // 跟專案其他地方（意見反饋視窗等）用的是同一套圖示庫，風格才不會分裂成兩套。
 const BOTTOM_NAV_ITEMS = [
   { id: 'clock', icon: Globe, labelKey: 'worldClock' },
-  { id: 'home', icon: null, labelKey: null }, // 中央特殊處理，見下方渲染邏輯
   { id: 'anniversary', icon: Heart, labelKey: 'navAnniversary' },
+  { id: 'home', icon: null, labelKey: null }, // 中央特殊處理，見下方渲染邏輯
   { id: 'gallery', icon: Images, labelKey: 'navGallery' },
   { id: 'profile', icon: User, labelKey: 'navProfile' },
 ];
@@ -6683,6 +6664,112 @@ function BottomNavigation({ activeTab, setActiveTab, t }) {
 // 相片本身仍然完全存在各自事件的 albums 欄位裡（events[].albums[].photos[]），這裡
 // 完全不建立、不複製任何新的照片資料，只是在畫面上把它們臨時攤平成一個陣列來顯示，
 // 不會影響、也不會取代原本「紀念日 → 某個事件 → 相冊」那一套既有的管理功能。
+/* ---------------- 紀念日分頁頂部的月曆（仿照參考圖：上面月曆、下面行程列表） ---------------- */
+// 完全複用既有的 getEffectiveDate()（已經處理好農曆／各種曆法／循環規則），對每個事件只算
+// 一次「從這個月第一天開始算，下一次會落在哪天」，落在目前顯示的月份裡才點一個標記，
+// 不用另外重新設計一套日期比對邏輯，也不會跟時間軸下面顯示的內容產生兩套不同的日期計算結果。
+// 點日期只是在月曆下面多顯示一小段「當天有哪些紀念日」的預覽，完全不會去過濾、修改下面
+// 那個原封不動的 TimelineSection 列表，兩者是各自獨立的兩塊內容。
+function AnniversaryCalendar({ events, lang, t, now }) {
+  const [viewDate, setViewDate] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = firstOfMonth.getDay();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const eventsByDay = {};
+  events.forEach(ev => {
+    const occ = getEffectiveDate(ev, firstOfMonth);
+    if (occ.getFullYear() === year && occ.getMonth() === month) {
+      const d = occ.getDate();
+      (eventsByDay[d] = eventsByDay[d] || []).push(ev);
+    }
+  });
+
+  const weekdayLabels = Array.from({ length: 7 }, (_, i) =>
+    new Intl.DateTimeFormat(LOCALE_MAP[lang], { weekday: 'short' }).format(new Date(2023, 0, 1 + i))
+  );
+
+  function goPrevMonth() { setViewDate(new Date(year, month - 1, 1)); setSelectedDay(null); }
+  function goNextMonth() { setViewDate(new Date(year, month + 1, 1)); setSelectedDay(null); }
+
+  const cells = [];
+  for (let i = 0; i < startWeekday; i++) cells.push({ day: daysInPrevMonth - startWeekday + 1 + i, inMonth: false });
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, inMonth: true });
+  let trailing = 1;
+  while (cells.length % 7 !== 0) cells.push({ day: trailing++, inMonth: false });
+
+  const isToday = (d) => d === now.getDate() && month === now.getMonth() && year === now.getFullYear();
+  const selectedEvents = selectedDay != null ? (eventsByDay[selectedDay] || []) : [];
+
+  return (
+    <div className="rounded-2xl p-4 flex-shrink-0" style={glass()}>
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={goPrevMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronLeft size={18} /></button>
+        <span className="font-bold text-sm" style={{ color: INK }}>
+          {new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric', month: 'long' }).format(viewDate)}
+        </span>
+        <button onClick={goNextMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronRight size={18} /></button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-1 text-center">
+        {weekdayLabels.map((w, i) => (
+          <span key={i} className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{w}</span>
+        ))}
+        {cells.map((c, i) => {
+          const dayEvents = c.inMonth ? (eventsByDay[c.day] || []) : [];
+          const selected = c.inMonth && selectedDay === c.day;
+          return (
+            <button
+              key={i}
+              disabled={!c.inMonth}
+              onClick={() => setSelectedDay(prev => (prev === c.day ? null : c.day))}
+              className="flex flex-col items-center justify-center py-1"
+              style={{ opacity: c.inMonth ? 1 : 0.25 }}
+            >
+              <span
+                className="flex items-center justify-center rounded-full text-xs font-bold"
+                style={{
+                  width: 26,
+                  height: 26,
+                  background: selected ? ACCENT : (isToday(c.day) && c.inMonth ? 'var(--card-border)' : 'transparent'),
+                  color: selected ? '#fff' : INK,
+                }}
+              >
+                {c.day}
+              </span>
+              <span className="flex items-center justify-center gap-0.5 mt-0.5" style={{ height: 4 }}>
+                {dayEvents.slice(0, 3).map((ev, di) => (
+                  <span key={di} className="rounded-full" style={{ width: 4, height: 4, background: colorHex(ev.colorId) }} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedDay != null && (
+        <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: CARD_BORDER }}>
+          {selectedEvents.length === 0 ? (
+            <p className="text-xs text-center" style={{ color: INK_SOFT }}>—</p>
+          ) : (
+            selectedEvents.map(ev => (
+              <div key={ev.id} className="flex items-center gap-2">
+                <span className="text-lg">{ev.icon}</span>
+                <span className="text-sm font-bold flex-1 truncate" style={{ color: INK }}>{ev.title}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GalleryPage({ events, t }) {
   const [viewingPhoto, setViewingPhoto] = useState(null); // { dataUrl, eventTitle, albumName } | null
 
@@ -6866,20 +6953,7 @@ export default function App() {
   // 版面本身固定不變，不會因為開啟詳情視窗而重排——詳情視窗（時鐘／地標）一律用置中彈窗顯示，
   // 跟手機版共用同一套元件與樣式（見 WorldClockSection／TimelineSection 內部各自的 createPortal）。
   const isLargeScreen = useIsLargeScreen();
-  const [clockModalOpen, setClockModalOpen] = useState(false);
   const [viewingId, setViewingId] = useState(null);
-
-  // 「目前位置時鐘詳情」跟「地標詳情」邏輯上互斥——同一時間只會有一張卡片是「使用者現在想看的」。
-  // 這裡包一層：開時鐘詳情時順手把地標詳情關掉，反過來開地標詳情時也順手把時鐘詳情關掉，
-  // 避免兩個彈窗同時疊在畫面上。
-  function openClockModalSafe(open) {
-    if (open) setViewingId(null);
-    setClockModalOpen(open);
-  }
-  function setViewingIdSafe(id) {
-    if (id) setClockModalOpen(false);
-    setViewingId(id);
-  }
 
   // File Handling API：使用者在作業系統裡直接用「開啟檔案」／雙擊 .tzzwnb 備份檔、
   // 或對著已安裝的 App 圖示把 .tzzwnb 檔拖進去時，瀏覽器會啟動這個 PWA 並把檔案透過
@@ -7558,8 +7632,6 @@ export default function App() {
                 isDraggingWorldClock={isDraggingWorldClock}
                 isLargeScreen
                 unlimitedHeight
-                clockModalOpen={clockModalOpen}
-                setClockModalOpen={openClockModalSafe}
               />
             </div>
 
@@ -7575,7 +7647,7 @@ export default function App() {
                 setCustomIcons={setCustomIcons}
                 isLargeScreen
                 viewingId={viewingId}
-                setViewingId={setViewingIdSafe}
+                setViewingId={setViewingId}
               />
             </div>
           </main>
@@ -7602,8 +7674,6 @@ export default function App() {
                     part2Ref={worldClockPart2Ref}
                     part2Height={worldClockPart2VisibleHeight}
                     isDraggingWorldClock={isDraggingWorldClock}
-                    clockModalOpen={clockModalOpen}
-                    setClockModalOpen={openClockModalSafe}
                   />
                 </div>
                 <TimelineSection
@@ -7619,47 +7689,60 @@ export default function App() {
                   onHeaderDragMove={handleWorldClockDragMove}
                   onHeaderDragEnd={handleWorldClockDragEnd}
                   viewingId={viewingId}
-                  setViewingId={setViewingIdSafe}
+                  setViewingId={setViewingId}
                 />
               </div>
 
-              {/* 世界時鐘（獨立分頁）：跟大屏那邊同一個做法，unlimitedHeight 讓它不用再
-                  像複合首頁那樣被高度上限卡住，城市／時區／排序／新增刪除等功能完全不動。 */}
-              {activeTab === 'clock' && (
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <WorldClockSection
-                    clocks={clocks}
-                    setClocks={setClocks}
-                    lang={lang}
-                    t={t}
-                    onHomeTzChange={setHomeTz}
-                    homeTzId={homeTzId}
-                    setHomeTzId={setHomeTzId}
-                    unlimitedHeight
-                    clockModalOpen={clockModalOpen}
-                    setClockModalOpen={openClockModalSafe}
-                  />
-                </div>
-              )}
+              {/* 世界時鐘（獨立分頁）：原本雙擊「目前位置」卡片才會跳出的時鐘詳情視窗，
+                  現在直接、常駐地變成這個分頁本身的內容（dock 模式＝不帶彈窗外框、沒有可以
+                  關閉的叉叉，因為它現在就是頁面本身，不是蓋在上面的彈窗）。
+                  時區的新增／刪除／排序等管理功能維持在「時光線」分頁裡的世界時鐘區塊操作，
+                  這裡專注在「看時間」本身。 */}
+              {activeTab === 'clock' && (() => {
+                const clockPageHomeClock = clocks.find(c => c.id === homeTzId) || null;
+                const clockPageRestClocks = clocks.filter(c => c.id !== homeTzId);
+                return (
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    {clockPageHomeClock ? (
+                      <CurrentLocationClockModal
+                        dock
+                        clock={clockPageHomeClock}
+                        now={now}
+                        lang={lang}
+                        t={t}
+                        restClocks={clockPageRestClocks}
+                        onClose={() => {}}
+                      />
+                    ) : (
+                      <p className="text-sm text-center py-10" style={{ color: INK_SOFT }}>{t.setAsCurrent}</p>
+                    )}
+                  </div>
+                );
+              })()}
 
-              {/* 紀念日（獨立分頁）：不傳 onHeaderDragStart/Move/End，元件內部已經用
-                  `onHeaderDragStart && ...` 這種寫法保護過，不傳就自然是無操作，不會報錯。
-                  生日／陪伴／關懷／紀念日／常規五種模式、國曆農曆、相冊入口全部原樣保留，
-                  只是拿到全螢幕高度、不用再跟世界時鐘擠在同一屏。 */}
+              {/* 紀念日（獨立分頁）：上面是新加的月曆（仿照參考圖，點日期可以預覽當天有哪些
+                  紀念日），下面是「時光線」裡時間軸那部分的內容，原封不動搬過來——不傳
+                  onHeaderDragStart/Move/End，元件內部已經用 `onHeaderDragStart && ...` 這種
+                  寫法保護過，不傳就自然是無操作，不會報錯。生日／陪伴／關懷／紀念日／常規
+                  五種模式、國曆農曆、相冊入口全部原樣保留，只是拿到全螢幕高度、不用再跟
+                  世界時鐘擠在同一屏。 */}
               {activeTab === 'anniversary' && (
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <TimelineSection
-                    events={events}
-                    setEvents={setEvents}
-                    lang={lang}
-                    t={t}
-                    now={now}
-                    isDark={isDark}
-                    customIcons={customIcons}
-                    setCustomIcons={setCustomIcons}
-                    viewingId={viewingId}
-                    setViewingId={setViewingIdSafe}
-                  />
+                <div className="flex-1 min-h-0 flex flex-col gap-3">
+                  <AnniversaryCalendar events={events} lang={lang} t={t} now={now} />
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <TimelineSection
+                      events={events}
+                      setEvents={setEvents}
+                      lang={lang}
+                      t={t}
+                      now={now}
+                      isDark={isDark}
+                      customIcons={customIcons}
+                      setCustomIcons={setCustomIcons}
+                      viewingId={viewingId}
+                      setViewingId={setViewingId}
+                    />
+                  </div>
                 </div>
               )}
 
