@@ -385,7 +385,7 @@ const STRINGS = {
     repeatLabel: '重複', every: '每', unitYear: '年', unitMonth: '個月',
     modeSelectLabel: '模式選擇',
     modeBirthday: '生日', modeCompanion: '陪伴', modeCare: '關懷', modeAnniversary: '紀念日', modeRegular: '常規',
-    navAnniversary: '紀念日', navGallery: '圖片庫', navProfile: '我的', myPageTitle: '我的',
+    navSchedule: '日程', navGallery: '圖片庫', navProfile: '我的', myPageTitle: '我的', addSchedule: '添加日程',
     darkModeLabel: '深色模式', darkModeOn: '開', darkModeOff: '關', feedbackLabel: '意見回饋',
     galleryEmpty: '目前還沒有任何相片，先到紀念日事件裡新增幾張吧', galleryFrom: e => `來自：${e}`,
     modeCompanionHint: '設定情誼開始的日子，得到你們相伴的時長。',
@@ -481,7 +481,7 @@ const STRINGS = {
     repeatLabel: 'Repeat', every: 'Every', unitYear: 'year(s)', unitMonth: 'month(s)',
     modeSelectLabel: 'Mode',
     modeBirthday: 'Birthday', modeCompanion: 'Companion', modeCare: 'Care', modeAnniversary: 'Anniversary', modeRegular: 'Regular',
-    navAnniversary: 'Anniversary', navGallery: 'Gallery', navProfile: 'Profile', myPageTitle: 'Profile',
+    navSchedule: 'Schedule', navGallery: 'Gallery', navProfile: 'Profile', myPageTitle: 'Profile', addSchedule: 'Add Schedule',
     darkModeLabel: 'Dark Mode', darkModeOn: 'On', darkModeOff: 'Off', feedbackLabel: 'Feedback',
     galleryEmpty: 'No photos yet — add some inside an anniversary event first', galleryFrom: e => `From: ${e}`,
     modeCompanionHint: "Set the day your bond began, and see how long you've been together.",
@@ -577,7 +577,7 @@ const STRINGS = {
     repeatLabel: '繰り返し', every: '毎', unitYear: '年', unitMonth: 'ヶ月',
     modeSelectLabel: 'モード選択',
     modeBirthday: '誕生日', modeCompanion: '寄り添い', modeCare: '追悼', modeAnniversary: '記念日', modeRegular: '通常',
-    navAnniversary: '記念日', navGallery: 'アルバム', navProfile: 'マイページ', myPageTitle: 'マイページ',
+    navSchedule: 'スケジュール', navGallery: 'アルバム', navProfile: 'マイページ', myPageTitle: 'マイページ', addSchedule: '予定を追加',
     darkModeLabel: 'ダークモード', darkModeOn: 'オン', darkModeOff: 'オフ', feedbackLabel: 'フィードバック',
     galleryEmpty: 'まだ写真がありません。まず記念日イベントの中で写真を追加してください', galleryFrom: e => `${e} より`,
     modeCompanionHint: '絆が始まった日を設定して、二人が共に過ごした時間を確認しましょう。',
@@ -673,7 +673,7 @@ const STRINGS = {
     repeatLabel: '반복', every: '매', unitYear: '년', unitMonth: '개월',
     modeSelectLabel: '모드 선택',
     modeBirthday: '생일', modeCompanion: '동반', modeCare: '추모', modeAnniversary: '기념일', modeRegular: '일반',
-    navAnniversary: '기념일', navGallery: '갤러리', navProfile: '마이페이지', myPageTitle: '마이페이지',
+    navSchedule: '일정', navGallery: '갤러리', navProfile: '마이페이지', myPageTitle: '마이페이지', addSchedule: '일정 추가',
     darkModeLabel: '다크 모드', darkModeOn: '켜짐', darkModeOff: '꺼짐', feedbackLabel: '피드백',
     galleryEmpty: '아직 사진이 없어요. 먼저 기념일 이벤트 안에서 사진을 추가해 보세요', galleryFrom: e => `출처: ${e}`,
     modeCompanionHint: '인연이 시작된 날을 설정하고 함께한 시간을 확인해 보세요.',
@@ -3755,7 +3755,13 @@ function TimelineSection({
   events, setEvents, lang, t, now, isDark, customIcons, setCustomIcons,
   onHeaderDragStart, onHeaderDragMove, onHeaderDragEnd,
   isLargeScreen = false, viewingId, setViewingId,
+  // layout='timeline'（預設）＝「時光線」分頁目前的樣子，完全不動：時間軸線、圓點、
+  // 往日地標收合區塊全部保留。layout='cards'＝「日程」分頁用，資料/邏輯完全共用同一份
+  // （events／processedEvents／新增編輯刪除相冊等等都沒有另外複製一份），只是渲染時
+  // 跳過時間軸視覺（軸線／圓點／pl-6 縮排）跟「往日地標」這個區塊，改成單純的事件卡片列表。
+  layout = 'timeline',
 }) {
+  const isCardsLayout = layout === 'cards';
   const [showForm, setShowForm] = useState(false);
   // 新增／編輯地標視窗的顯示階段：保留 mounted 狀態直到關閉動畫完成，
   // 這樣視窗不會在關閉瞬間消失。
@@ -4136,6 +4142,74 @@ function TimelineSection({
     : null;
 
   function renderEventCard(ev) {
+    const cardInner = (
+      <div
+        className="p-4 rounded-2xl relative group cursor-pointer"
+        style={{
+          ...glass(ev.id === editingId ? { border: `1.5px solid ${ACCENT}` } : {}),
+          position: 'relative',
+          zIndex: 1,
+        }}
+        onClick={() => setViewingId(ev.id)}
+      >
+        <div className="flex justify-between items-start mb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{ev.icon}</span>
+            <h3 className="font-bold text-lg" style={{ color: INK }}>{ev.title}</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={e => { e.stopPropagation(); openAlbumModal(ev.id); }} aria-label={t.album} title={t.album} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <Images size={15} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); startEdit(ev); }} aria-label={t.edit} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <Pencil size={15} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); openDeleteConfirm(ev.id); }} aria-label={t.delete} className="p-2 rounded-lg transition-colors" style={{ color: DANGER }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,0,74,0.14)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="text-sm font-medium mb-1 flex items-center gap-2 flex-wrap" style={{ color: INK_SOFT }}>
+          <span>{ev.targetDate.toLocaleDateString(LOCALE_MAP[lang])}</span>
+          {ev.repeat && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'var(--card-border)', color: INK_SOFT }}>
+              {ev.repeatUnit === 'month' ? t.monthlyBadge(ev.repeatInterval) : t.yearlyBadge(ev.repeatInterval)}
+            </span>
+          )}
+        </div>
+        {ev.calendar && ev.calendar !== 'gregory' && (
+          <div className="text-xs font-medium mb-2" style={{ color: ACCENT }}>
+            {formatAltCalendar(ev.targetDate, ev.calendar, lang, t)}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="inline-block px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
+            {ev.mode === 'companion'
+              ? t.companionDays(Math.max(0, ev.elapsedDays ?? 0))
+              : ev.diffDays === 0 ? t.today : ev.diffDays > 0 ? t.daysLeft(ev.diffDays) : t.daysAgo(Math.abs(ev.diffDays))}
+          </div>
+          {ev.age !== null && (
+            <div className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
+              {ev.isCare ? t.anniversaryBadge(ev.age) : t.ageBadge(ev.age)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+
+    // cards 模式（日程分頁）：不畫時間軸圓點跟連接線，卡片本身內容一模一樣，只是拿掉外層
+    // 那個 `pl-6` + 絕對定位圓點的包裝。timeline 模式（時光線分頁）完全維持原樣。
+    if (isCardsLayout) {
+      return <div key={ev.id}>{cardInner}</div>;
+    }
     return (
       <div key={ev.id} className="relative pl-6" style={{ zIndex: 10 }}>
         {/* 圓點指示器：整個事件項目建立獨立堆疊層，圓點永遠位於時間軸線與卡片之上。
@@ -4155,67 +4229,7 @@ function TimelineSection({
             pointerEvents: 'none',
           }}
         />
-
-        <div
-          className="p-4 rounded-2xl relative group cursor-pointer"
-          style={{
-            ...glass(ev.id === editingId ? { border: `1.5px solid ${ACCENT}` } : {}),
-            position: 'relative',
-            zIndex: 1,
-          }}
-          onClick={() => setViewingId(ev.id)}
-        >
-          <div className="flex justify-between items-start mb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{ev.icon}</span>
-              <h3 className="font-bold text-lg" style={{ color: INK }}>{ev.title}</h3>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={e => { e.stopPropagation(); openAlbumModal(ev.id); }} aria-label={t.album} title={t.album} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <Images size={15} />
-              </button>
-              <button onClick={e => { e.stopPropagation(); startEdit(ev); }} aria-label={t.edit} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <Pencil size={15} />
-              </button>
-              <button onClick={e => { e.stopPropagation(); openDeleteConfirm(ev.id); }} aria-label={t.delete} className="p-2 rounded-lg transition-colors" style={{ color: DANGER }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,0,74,0.14)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-
-          <div className="text-sm font-medium mb-1 flex items-center gap-2 flex-wrap" style={{ color: INK_SOFT }}>
-            <span>{ev.targetDate.toLocaleDateString(LOCALE_MAP[lang])}</span>
-            {ev.repeat && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ background: 'var(--card-border)', color: INK_SOFT }}>
-                {ev.repeatUnit === 'month' ? t.monthlyBadge(ev.repeatInterval) : t.yearlyBadge(ev.repeatInterval)}
-              </span>
-            )}
-          </div>
-          {ev.calendar && ev.calendar !== 'gregory' && (
-            <div className="text-xs font-medium mb-2" style={{ color: ACCENT }}>
-              {formatAltCalendar(ev.targetDate, ev.calendar, lang, t)}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-block px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
-              {ev.mode === 'companion'
-                ? t.companionDays(Math.max(0, ev.elapsedDays ?? 0))
-                : ev.diffDays === 0 ? t.today : ev.diffDays > 0 ? t.daysLeft(ev.diffDays) : t.daysAgo(Math.abs(ev.diffDays))}
-            </div>
-            {ev.age !== null && (
-              <div className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-sm font-bold" style={{ background: `${colorHex(ev.colorId)}20`, color: colorHex(ev.colorId) }}>
-                {ev.isCare ? t.anniversaryBadge(ev.age) : t.ageBadge(ev.age)}
-              </div>
-            )}
-          </div>
-        </div>
+        {cardInner}
       </div>
     );
   }
@@ -4228,19 +4242,27 @@ function TimelineSection({
       <div className="flex-shrink-0">
       <div
         className="flex items-center justify-between mb-3 select-none"
-        style={{ cursor: 'ns-resize', touchAction: 'none' }}
+        style={isCardsLayout ? undefined : { cursor: 'ns-resize', touchAction: 'none' }}
         onPointerDown={e => {
+          if (isCardsLayout) return; // cards 模式（日程分頁）沒有可拖曳收合的世界時鐘在上面，這個手勢用不到
           if (e.target.closest('button')) return; // 標題列右側的按鈕不應觸發拖曳
           e.currentTarget.setPointerCapture(e.pointerId);
           onHeaderDragStart && onHeaderDragStart(e.clientY);
         }}
-        onPointerMove={e => { if (e.buttons === 1) onHeaderDragMove && onHeaderDragMove(e.clientY); }}
-        onPointerUp={() => onHeaderDragEnd && onHeaderDragEnd()}
-        onPointerCancel={() => onHeaderDragEnd && onHeaderDragEnd()}
+        onPointerMove={e => { if (!isCardsLayout && e.buttons === 1) onHeaderDragMove && onHeaderDragMove(e.clientY); }}
+        onPointerUp={() => !isCardsLayout && onHeaderDragEnd && onHeaderDragEnd()}
+        onPointerCancel={() => !isCardsLayout && onHeaderDragEnd && onHeaderDragEnd()}
       >
+        {/* cards 模式（日程分頁）不再重複顯示「時間軸」這個標題文字——頁面最上面已經有
+            「日程」這個頁面標題了（見 App() 裡的頁面標題邏輯），這裡留空只保留右側的
+            搜尋／新增按鈕，避免同一個畫面出現兩個標題疊在一起。 */}
         <div className="flex items-center gap-2">
-          <MapPin size="1.125rem" style={{ color: MINT }} />
-          <h2 className="font-bold" style={{ color: INK, fontSize: '1.125rem' }}>{t.timeline}</h2>
+          {!isCardsLayout && (
+            <>
+              <MapPin size="1.125rem" style={{ color: MINT }} />
+              <h2 className="font-bold" style={{ color: INK, fontSize: '1.125rem' }}>{t.timeline}</h2>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -4256,7 +4278,7 @@ function TimelineSection({
             style={{ background: showForm ? INK_SOFT : MINT, color: '#fff' }}
           >
             {showForm ? <X size={14} /> : <Plus size={14} />}
-            {showForm ? t.cancel : t.newLandmark}
+            {showForm ? t.cancel : (isCardsLayout ? t.addSchedule : t.newLandmark)}
           </button>
         </div>
       </div>
@@ -4276,8 +4298,10 @@ function TimelineSection({
       )}
       </div>
 
-      {/* 時間軸列表：獨立的捲動容器，不再需要自動捲動 —— 過去的地標已收進上方可收合區塊，
-          預設收合，所以第一眼看到的永遠是最近的未來地標 */}
+      {/* 事件列表：獨立的捲動容器。timeline 模式（時光線分頁）維持原本的軸線＋往日地標收合區塊；
+          cards 模式（日程分頁）只保留卡片本身，不畫軸線、不顯示「往日地標」這個區塊——
+          資料（pastEvents／upcomingEvents／processedEvents）完全沒有另外處理，
+          只是這裡選擇要不要把它們渲染出來。 */}
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto pb-6">
         {isSearching ? (
           searchResults.length === 0 ? (
@@ -4285,7 +4309,10 @@ function TimelineSection({
               <p style={{ color: INK, fontWeight: 'bold' }}>{t.noSearchResults}</p>
             </div>
           ) : (
-            <div className="relative pl-4 border-l-2 ml-2 flex flex-col" style={{ borderColor: '#000', zIndex: 0, gap: EVENT_CARD_GAP }}>
+            <div
+              className={isCardsLayout ? 'flex flex-col' : 'relative pl-4 border-l-2 ml-2 flex flex-col'}
+              style={isCardsLayout ? { gap: EVENT_CARD_GAP } : { borderColor: '#000', zIndex: 0, gap: EVENT_CARD_GAP }}
+            >
               {searchResults.map(renderEventCard)}
             </div>
           )
@@ -4294,6 +4321,19 @@ function TimelineSection({
             <p style={{ color: INK, fontWeight: 'bold' }}>{t.emptyTimeline}</p>
             <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
           </div>
+        ) : isCardsLayout ? (
+          // cards 模式：不畫軸線、不顯示「往日地標」收合區塊，只列出未來（含今天）的事件卡片。
+          // pastEvents 這份資料完全沒被動到，只是這裡不渲染它——之後「時光線」分頁一樣看得到。
+          upcomingEvents.length > 0 ? (
+            <div className="flex flex-col" style={{ gap: EVENT_CARD_GAP }}>
+              {upcomingEvents.map(renderEventCard)}
+            </div>
+          ) : (
+            <div className="py-8">
+              <p style={{ color: INK, fontWeight: 'bold' }}>{t.emptyTimeline}</p>
+              <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
+            </div>
+          )
         ) : (
           <div className="relative pl-4 ml-2" style={{ zIndex: 0 }}>
             {/* 單一貫穿到底的軸線：改用一條絕對定位的線條元素，從收合按鈕最上面一路畫到
@@ -4390,7 +4430,7 @@ function TimelineSection({
               <div className="flex items-center justify-between -mb-1">
                 <div className="flex items-center gap-2">
                   {editingId ? <Pencil size={14} style={{ color: ACCENT }} /> : <Plus size={14} style={{ color: MINT }} />}
-                  <span className="text-sm font-bold" style={{ color: INK }}>{editingId ? t.editLandmark : t.newLandmark}</span>
+                  <span className="text-sm font-bold" style={{ color: INK }}>{editingId ? t.editLandmark : (isCardsLayout ? t.addSchedule : t.newLandmark)}</span>
                 </div>
                 <button onClick={toggleForm} style={{ color: INK_SOFT }}><X size={18} /></button>
               </div>
@@ -6580,7 +6620,7 @@ async function saveCloudDataBestEffort(uid, fullData) {
 // 跟專案其他地方（意見反饋視窗等）用的是同一套圖示庫，風格才不會分裂成兩套。
 const BOTTOM_NAV_ITEMS = [
   { id: 'clock', icon: Globe, labelKey: 'worldClock' },
-  { id: 'anniversary', icon: Heart, labelKey: 'navAnniversary' },
+  { id: 'schedule', icon: Heart, labelKey: 'navSchedule' },
   { id: 'home', icon: null, labelKey: null }, // 中央特殊處理，見下方渲染邏輯
   { id: 'gallery', icon: Images, labelKey: 'navGallery' },
   { id: 'profile', icon: User, labelKey: 'navProfile' },
@@ -6673,6 +6713,11 @@ function BottomNavigation({ activeTab, setActiveTab, t }) {
 function AnniversaryCalendar({ events, lang, t, now }) {
   const [viewDate, setViewDate] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [selectedDay, setSelectedDay] = useState(null);
+  // 收起／展開：預設展開。收起時只留月份標題列（含上下月切換），下面的月曆格子跟選中日
+  // 預覽整塊收合，讓下面的事件卡片能拿到更多空間——用 maxHeight+opacity 做轉場，
+  // 跟 FeedbackModal 裡輸入框放大/收合是同一套手法，200~260ms 的自然過渡。
+  const [collapsed, setCollapsed] = useState(false);
+  const CALENDAR_TRANSITION_MS = 260;
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
@@ -6710,62 +6755,84 @@ function AnniversaryCalendar({ events, lang, t, now }) {
     <div className="rounded-2xl p-4 flex-shrink-0" style={glass()}>
       <div className="flex items-center justify-between mb-3">
         <button onClick={goPrevMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronLeft size={18} /></button>
-        <span className="font-bold text-sm" style={{ color: INK }}>
-          {new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric', month: 'long' }).format(viewDate)}
-        </span>
+        <button
+          onClick={() => setCollapsed(v => !v)}
+          className="flex items-center gap-1.5"
+        >
+          <span className="font-bold text-sm" style={{ color: INK }}>
+            {new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric', month: 'long' }).format(viewDate)}
+          </span>
+          <ChevronDown
+            size={14}
+            style={{
+              color: INK_SOFT,
+              transform: collapsed ? 'rotate(-90deg)' : 'none',
+              transition: `transform ${CALENDAR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+            }}
+          />
+        </button>
         <button onClick={goNextMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronRight size={18} /></button>
       </div>
 
-      <div className="grid grid-cols-7 gap-y-1 text-center">
-        {weekdayLabels.map((w, i) => (
-          <span key={i} className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{w}</span>
-        ))}
-        {cells.map((c, i) => {
-          const dayEvents = c.inMonth ? (eventsByDay[c.day] || []) : [];
-          const selected = c.inMonth && selectedDay === c.day;
-          return (
-            <button
-              key={i}
-              disabled={!c.inMonth}
-              onClick={() => setSelectedDay(prev => (prev === c.day ? null : c.day))}
-              className="flex flex-col items-center justify-center py-1"
-              style={{ opacity: c.inMonth ? 1 : 0.25 }}
-            >
-              <span
-                className="flex items-center justify-center rounded-full text-xs font-bold"
-                style={{
-                  width: 26,
-                  height: 26,
-                  background: selected ? ACCENT : (isToday(c.day) && c.inMonth ? 'var(--card-border)' : 'transparent'),
-                  color: selected ? '#fff' : INK,
-                }}
+      <div
+        style={{
+          maxHeight: collapsed ? 0 : 420,
+          opacity: collapsed ? 0 : 1,
+          overflow: 'hidden',
+          transition: `max-height ${CALENDAR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${CALENDAR_TRANSITION_MS * 0.7}ms ease`,
+        }}
+      >
+        <div className="grid grid-cols-7 gap-y-1 text-center">
+          {weekdayLabels.map((w, i) => (
+            <span key={i} className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{w}</span>
+          ))}
+          {cells.map((c, i) => {
+            const dayEvents = c.inMonth ? (eventsByDay[c.day] || []) : [];
+            const selected = c.inMonth && selectedDay === c.day;
+            return (
+              <button
+                key={i}
+                disabled={!c.inMonth}
+                onClick={() => setSelectedDay(prev => (prev === c.day ? null : c.day))}
+                className="flex flex-col items-center justify-center py-1"
+                style={{ opacity: c.inMonth ? 1 : 0.25 }}
               >
-                {c.day}
-              </span>
-              <span className="flex items-center justify-center gap-0.5 mt-0.5" style={{ height: 4 }}>
-                {dayEvents.slice(0, 3).map((ev, di) => (
-                  <span key={di} className="rounded-full" style={{ width: 4, height: 4, background: colorHex(ev.colorId) }} />
-                ))}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedDay != null && (
-        <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: CARD_BORDER }}>
-          {selectedEvents.length === 0 ? (
-            <p className="text-xs text-center" style={{ color: INK_SOFT }}>—</p>
-          ) : (
-            selectedEvents.map(ev => (
-              <div key={ev.id} className="flex items-center gap-2">
-                <span className="text-lg">{ev.icon}</span>
-                <span className="text-sm font-bold flex-1 truncate" style={{ color: INK }}>{ev.title}</span>
-              </div>
-            ))
-          )}
+                <span
+                  className="flex items-center justify-center rounded-full text-xs font-bold"
+                  style={{
+                    width: 26,
+                    height: 26,
+                    background: selected ? ACCENT : (isToday(c.day) && c.inMonth ? 'var(--card-border)' : 'transparent'),
+                    color: selected ? '#fff' : INK,
+                  }}
+                >
+                  {c.day}
+                </span>
+                <span className="flex items-center justify-center gap-0.5 mt-0.5" style={{ height: 4 }}>
+                  {dayEvents.slice(0, 3).map((ev, di) => (
+                    <span key={di} className="rounded-full" style={{ width: 4, height: 4, background: colorHex(ev.colorId) }} />
+                  ))}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      )}
+
+        {selectedDay != null && (
+          <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: CARD_BORDER }}>
+            {selectedEvents.length === 0 ? (
+              <p className="text-xs text-center" style={{ color: INK_SOFT }}>—</p>
+            ) : (
+              selectedEvents.map(ev => (
+                <div key={ev.id} className="flex items-center gap-2">
+                  <span className="text-lg">{ev.icon}</span>
+                  <span className="text-sm font-bold flex-1 truncate" style={{ color: INK }}>{ev.title}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -7556,8 +7623,18 @@ export default function App() {
             的環境下 env() 會是 0，不會多留任何空白，不影響 PWA 原本的間距。 */}
         <header className="px-6 py-6 flex items-center justify-between flex-shrink-0" style={{ background: 'var(--header-bg)', backdropFilter: 'blur(10px)', position: 'relative', zIndex: 30, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}>
           <div>
-            <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>{t[greeting.key]} {greeting.emoji}</h1>
-            <p className="text-xs font-medium mt-1" style={{ color: INK_SOFT }}>{t.todayIs(todayStr)}</p>
+            {/* 問候語只在「時光線」分頁顯示（桌面版沒有分頁切換的概念，永遠視同時光線）；
+                其餘分頁改顯示對應的頁面標題，不再繼續顯示「下午好」這類首頁專屬文字。 */}
+            {isLargeScreen || activeTab === 'home' ? (
+              <>
+                <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>{t[greeting.key]} {greeting.emoji}</h1>
+                <p className="text-xs font-medium mt-1" style={{ color: INK_SOFT }}>{t.todayIs(todayStr)}</p>
+              </>
+            ) : (
+              <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>
+                {{ clock: t.worldClock, schedule: t.navSchedule, gallery: t.navGallery, profile: t.navProfile }[activeTab] || ''}
+              </h1>
+            )}
           </div>
           {/* 帳號／提醒／意見回饋／深色模式／語言這排圖示，手機版已經整組搬進「我的」分頁
               （見 ProfilePage），Header 精簡到只剩問候語；大屏（isLargeScreen）沒有底部導覽列，
@@ -7693,40 +7770,33 @@ export default function App() {
                 />
               </div>
 
-              {/* 世界時鐘（獨立分頁）：原本雙擊「目前位置」卡片才會跳出的時鐘詳情視窗，
-                  現在直接、常駐地變成這個分頁本身的內容（dock 模式＝不帶彈窗外框、沒有可以
-                  關閉的叉叉，因為它現在就是頁面本身，不是蓋在上面的彈窗）。
-                  時區的新增／刪除／排序等管理功能維持在「時光線」分頁裡的世界時鐘區塊操作，
-                  這裡專注在「看時間」本身。 */}
-              {activeTab === 'clock' && (() => {
-                const clockPageHomeClock = clocks.find(c => c.id === homeTzId) || null;
-                const clockPageRestClocks = clocks.filter(c => c.id !== homeTzId);
-                return (
-                  <div className="flex-1 min-h-0 overflow-y-auto">
-                    {clockPageHomeClock ? (
-                      <CurrentLocationClockModal
-                        dock
-                        clock={clockPageHomeClock}
-                        now={now}
-                        lang={lang}
-                        t={t}
-                        restClocks={clockPageRestClocks}
-                        onClose={() => {}}
-                      />
-                    ) : (
-                      <p className="text-sm text-center py-10" style={{ color: INK_SOFT }}>{t.setAsCurrent}</p>
-                    )}
-                  </div>
-                );
-              })()}
+              {/* 世界時鐘（獨立分頁）：不是把「時光線」首頁那個世界時鐘視窗原封不動搬過來——
+                  這裡拿掉了首頁版本特有的高度上限與拖曳收合手勢（那是為了跟下面的時間軸
+                  共用畫面高度才有的機制，這個獨立分頁沒有時間軸要爭空間），改用
+                  unlimitedHeight 讓整頁世界時鐘用滿版面，更有獨立完整頁面的感覺；
+                  城市／時區／時間顯示／城市管理／新增／刪除／排序等全部功能、資料邏輯都跟
+                  「時光線」共用同一份 clocks／setClocks，一個字都沒少。 */}
+              {activeTab === 'clock' && (
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <WorldClockSection
+                    clocks={clocks}
+                    setClocks={setClocks}
+                    lang={lang}
+                    t={t}
+                    onHomeTzChange={setHomeTz}
+                    homeTzId={homeTzId}
+                    setHomeTzId={setHomeTzId}
+                    unlimitedHeight
+                  />
+                </div>
+              )}
 
-              {/* 紀念日（獨立分頁）：上面是新加的月曆（仿照參考圖，點日期可以預覽當天有哪些
-                  紀念日），下面是「時光線」裡時間軸那部分的內容，原封不動搬過來——不傳
-                  onHeaderDragStart/Move/End，元件內部已經用 `onHeaderDragStart && ...` 這種
-                  寫法保護過，不傳就自然是無操作，不會報錯。生日／陪伴／關懷／紀念日／常規
-                  五種模式、國曆農曆、相冊入口全部原樣保留，只是拿到全螢幕高度、不用再跟
-                  世界時鐘擠在同一屏。 */}
-              {activeTab === 'anniversary' && (
+              {/* 日程（獨立分頁，原「紀念日」分頁更名）：上面是月曆（可收合，見 AnniversaryCalendar），
+                  下面是事件卡片列表——資料跟「時光線」共用同一份 events／處理邏輯，只是這裡傳
+                  layout="cards" 讓 TimelineSection 跳過時間軸視覺（軸線／圓點／往日地標區塊），
+                  改成單純的事件卡片。生日／陪伴／關懷／紀念日／常規五種模式、國曆農曆、
+                  相冊入口、新增／編輯／刪除全部原樣保留，只是不再顯示時間軸的視覺結構。 */}
+              {activeTab === 'schedule' && (
                 <div className="flex-1 min-h-0 flex flex-col gap-3">
                   <AnniversaryCalendar events={events} lang={lang} t={t} now={now} />
                   <div className="flex-1 min-h-0 overflow-y-auto">
@@ -7741,6 +7811,7 @@ export default function App() {
                       setCustomIcons={setCustomIcons}
                       viewingId={viewingId}
                       setViewingId={setViewingId}
+                      layout="cards"
                     />
                   </div>
                 </div>
