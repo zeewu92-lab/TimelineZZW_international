@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, X, MapPin, Check, Clock, Globe, Sun, Moon, Pencil, User, LogOut, Mail, Eye, EyeOff, Search, SlidersHorizontal, Share2, Bell, BellOff, Settings, Images, Move, Heart } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, X, MapPin, Check, Clock, Globe, Sun, Moon, Pencil, User, LogOut, Mail, Eye, EyeOff, Search, SlidersHorizontal, Share2, Bell, BellOff, Settings, Images, Move, Calendar } from 'lucide-react';
 import {
   watchAuthState, signUpWithEmail, signInWithEmail, signInWithGoogle, signInWithApple,
   sendMagicLink, completeEmailLinkSignInIfNeeded, signOutUser,
@@ -386,6 +386,9 @@ const STRINGS = {
     modeSelectLabel: '模式選擇',
     modeBirthday: '生日', modeCompanion: '陪伴', modeCare: '關懷', modeAnniversary: '紀念日', modeRegular: '常規',
     navSchedule: '日程', navGallery: '相冊', navProfile: '我的', myPageTitle: '我的', addSchedule: '添加日程',
+    calendarMonthView: '月', calendarYearView: '年', calendarChooseDate: '選擇年份與月份',
+    calendarPrev: '上一個', calendarNext: '下一個', calendarConfirmYear: '確定',
+    futureOnlyLabel: '只展示未來代辦事件',
     darkModeLabel: '深色模式', darkModeOn: '開', darkModeOff: '關', feedbackLabel: '意見回饋',
     modeCompanionHint: '設定情誼開始的日子，得到你們相伴的時長。',
     modeAnniversaryHint: '設定一個值得銘記的日子，讓時光線替你記錄一路點滴。',
@@ -487,6 +490,9 @@ const STRINGS = {
     modeSelectLabel: 'Mode',
     modeBirthday: 'Birthday', modeCompanion: 'Companion', modeCare: 'Care', modeAnniversary: 'Anniversary', modeRegular: 'Regular',
     navSchedule: 'Schedule', navGallery: 'Albums', navProfile: 'Profile', myPageTitle: 'Profile', addSchedule: 'Add Schedule',
+    calendarMonthView: 'Month', calendarYearView: 'Year', calendarChooseDate: 'Choose year and month',
+    calendarPrev: 'Previous', calendarNext: 'Next', calendarConfirmYear: 'Done',
+    futureOnlyLabel: 'Show upcoming events only',
     darkModeLabel: 'Dark Mode', darkModeOn: 'On', darkModeOff: 'Off', feedbackLabel: 'Feedback',
     modeCompanionHint: "Set the day your bond began, and see how long you've been together.",
     modeAnniversaryHint: 'Set a day worth remembering, and let TimeLine track every moment along the way.',
@@ -588,6 +594,9 @@ const STRINGS = {
     modeSelectLabel: 'モード選択',
     modeBirthday: '誕生日', modeCompanion: '寄り添い', modeCare: '追悼', modeAnniversary: '記念日', modeRegular: '通常',
     navSchedule: 'スケジュール', navGallery: 'アルバム', navProfile: 'マイページ', myPageTitle: 'マイページ', addSchedule: '予定を追加',
+    calendarMonthView: '月', calendarYearView: '年', calendarChooseDate: '年月を選択',
+    calendarPrev: '前へ', calendarNext: '次へ', calendarConfirmYear: '決定',
+    futureOnlyLabel: '今後の予定のみ表示',
     darkModeLabel: 'ダークモード', darkModeOn: 'オン', darkModeOff: 'オフ', feedbackLabel: 'フィードバック',
     modeCompanionHint: '絆が始まった日を設定して、二人が共に過ごした時間を確認しましょう。',
     modeAnniversaryHint: '心に刻みたい日を設定すれば、時間軸がここまでの歩みをそっと記録します。',
@@ -689,6 +698,9 @@ const STRINGS = {
     modeSelectLabel: '모드 선택',
     modeBirthday: '생일', modeCompanion: '동반', modeCare: '추모', modeAnniversary: '기념일', modeRegular: '일반',
     navSchedule: '일정', navGallery: '앨범', navProfile: '마이페이지', myPageTitle: '마이페이지', addSchedule: '일정 추가',
+    calendarMonthView: '월', calendarYearView: '년', calendarChooseDate: '연도와 월 선택',
+    calendarPrev: '이전', calendarNext: '다음', calendarConfirmYear: '확인',
+    futureOnlyLabel: '앞으로의 일정만 표시',
     darkModeLabel: '다크 모드', darkModeOn: '켜짐', darkModeOff: '꺼짐', feedbackLabel: '피드백',
     modeCompanionHint: '인연이 시작된 날을 설정하고 함께한 시간을 확인해 보세요.',
     modeAnniversaryHint: '기억하고 싶은 날을 설정하면 타임라인이 그동안의 발자취를 기록해 줍니다.',
@@ -3780,6 +3792,19 @@ function TimelineSection({
   // （events／processedEvents／新增編輯刪除相冊等等都沒有另外複製一份），只是渲染時
   // 跳過時間軸視覺（軸線／圓點／pl-6 縮排）跟「往日地標」這個區塊，改成單純的事件卡片列表。
   layout = 'timeline',
+  // 以下三個 prop 只有 layout='cards'（日程分頁）會用到：
+  // controlsPortalEl —「新增日程／搜尋」這排按鈕（連同展開時的搜尋輸入框）改用 createPortal
+  // 掛到這個 DOM 節點底下，而不是照舊渲染在原本位置。這個節點由 App() 建立、放在日曆上方，
+  // 讓按鈕實際顯示的位置能挪到日曆之上，同時按鈕本身的狀態（showForm／searchOpen／
+  // searchQuery……）完全不用搬家，還是留在 TimelineSection 內部，只是渲染輸出的落點不同。
+  // rangeFilter — 日曆目前顯示的時間範圍｛mode:'month'|'year', year, month?｝，由
+  // AnniversaryCalendar 算出、透過 App() 往下傳，日程卡片列表依這個範圍重新計算要顯示哪些事件
+  // （見下方 rangedEvents），取代原本「只看未來」的算法。
+  // futureOnly —「只展示未來代辦事件」開關目前的狀態，同樣由 App() 持有（放在按鈕列跟日曆
+  // 之間，不是這個元件自己的內部狀態）。
+  controlsPortalEl = null,
+  rangeFilter = null,
+  futureOnly = true,
 }) {
   const isCardsLayout = layout === 'cards';
   const [showForm, setShowForm] = useState(false);
@@ -4128,8 +4153,48 @@ function TimelineSection({
 
   // 已經過去（diffDays < 0）的地標一律歸進上方可收合的區塊，預設收合，
   // 這樣不論未來地標有幾筆（即使只有一筆），開啟頁面時第一眼看到的永遠是它，不必再手動下滑
+  // （這份 pastEvents／upcomingEvents 只給 layout='timeline'（時光線分頁）用；
+  // cards 模式（日程分頁）改用下面的 rangedEvents，跟著日曆目前選的月份／年份走，見需求六）
   const pastEvents = processedEvents.filter(ev => ev.diffDays < 0);
   const upcomingEvents = processedEvents.filter(ev => ev.diffDays >= 0);
+
+  // cards 模式（日程分頁）專用：依日曆目前選擇的時間範圍（月或年），重新算出落在該範圍內的
+  // 事件發生日——這跟 processedEvents 在算的「這個事件最近一次會發生在什麼時候」不是同一件事
+  // （使用者在日曆上翻到過去或未來的月份／年份時，兩者給出的日期可能不同），所以另外算一份，
+  // 不去動 processedEvents 原本的邏輯與用途（時間軸分頁、編輯/刪除/相冊彈窗依然完全依賴它）。
+  // 年檢視需要逐月掃描 12 次，才能抓到「每個月各自最近一次落在那個月裡的發生日」——例如每月
+  // 重複的事件，一整年應該出現 12 次，不是只出現一次。
+  const rangedEvents = (() => {
+    if (!isCardsLayout || !rangeFilter) return [];
+    const monthsToScan = rangeFilter.mode === 'year'
+      ? Array.from({ length: 12 }, (_, m) => m)
+      : [rangeFilter.month];
+    const todayTime = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const results = [];
+    events.forEach(ev => {
+      monthsToScan.forEach(m => {
+        const ref = new Date(rangeFilter.year, m, 1);
+        const occ = getEffectiveDate(ev, ref);
+        if (occ.getFullYear() !== rangeFilter.year || occ.getMonth() !== m) return;
+        const targetTime = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate()).getTime();
+        const diffDays = Math.ceil((targetTime - todayTime) / (1000 * 60 * 60 * 24));
+        let age = null;
+        if ((ev.isBirthday || ev.isCare) && ev.repeat) {
+          const origDate = combineDateTime(ev.date, ev.time);
+          age = Math.max(0, occ.getFullYear() - origDate.getFullYear());
+        }
+        const origDateOnly = new Date(`${ev.date}T00:00:00`);
+        const elapsedDays = Math.floor((todayTime - origDateOnly.getTime()) / (1000 * 60 * 60 * 24));
+        // 同一筆事件在年檢視底下可能一年出現好幾次（例如每月重複），key 不能只用 ev.id，
+        // 另外帶上發生日期時間戳記做成 __occKey，渲染卡片時才不會撞 key。
+        results.push({ ...ev, targetDate: occ, diffDays, age, elapsedDays, __occKey: `${ev.id}::${occ.getTime()}` });
+      });
+    });
+    results.sort((a, b) => a.targetDate - b.targetDate);
+    // 開關開啟：只留「尚未發生的未來事件」；關閉：該時間範圍內的全部事件都顯示，
+    // 包括已經過去／已發生的（見需求七）。
+    return futureOnly ? results.filter(ev => ev.diffDays >= 0) : results;
+  })();
 
   // 搜尋：輸入關鍵字時，直接在全部地標（不分過去／未來）中比對標題，跳出原本的分區顯示
   const searchQueryNormalized = searchQuery.trim().toLowerCase();
@@ -4204,11 +4269,13 @@ function TimelineSection({
 
     // cards 模式（日程分頁）：不畫時間軸圓點跟連接線，卡片本身內容一模一樣，只是拿掉外層
     // 那個 `pl-6` + 絕對定位圓點的包裝。timeline 模式（時光線分頁）完全維持原樣。
+    // key 優先用 __occKey（rangedEvents 年檢視底下，同一筆事件可能一年出現好幾次，
+    // 只用 ev.id 會撞 key）；沒有 __occKey 時（例如搜尋結果，來自 processedEvents）退回用 ev.id。
     if (isCardsLayout) {
-      return <div key={ev.id}>{cardInner}</div>;
+      return <div key={ev.__occKey || ev.id}>{cardInner}</div>;
     }
     return (
-      <div key={ev.id} className="relative pl-6" style={{ zIndex: 10 }}>
+      <div key={ev.__occKey || ev.id} className="relative pl-6" style={{ zIndex: 10 }}>
         {/* 圓點指示器：整個事件項目建立獨立堆疊層，圓點永遠位於時間軸線與卡片之上。
             left／top 用 rem 而非寫死 px，縮放時才會跟軸線同步移動、保持對齊。
             拿掉了原本 boxShadow 最外層跟背景同色的那圈（0 0 0 2px var(--page-bg)），
@@ -4231,12 +4298,13 @@ function TimelineSection({
     );
   }
 
-  return (
-    <div id="timeline-section-root" className="flex-1 min-h-0 flex flex-col">
-      {/* 固定區塊：只有時間軸標題列＋搜尋／新增地標按鈕，永遠固定不動、不隨清單捲動。
-          標題列本身可以往上拖曳，收合上方「世界時鐘」的次要時區清單，騰出畫面給時間軸；
-          最高只能拖到「目前位置」卡片（若有）或「世界時鐘」標題列底下，不會蓋住它們 */}
-      <div className="flex-shrink-0">
+  // 「新增日程／搜尋」這排按鈕（含展開時的搜尋輸入框）：timeline 模式（時光線分頁）維持原本
+  // 位置，固定在清單最上方、可拖曳收合世界時鐘。cards 模式（日程分頁）改成透過 createPortal
+  // 掛到 controlsPortalEl（App() 裡放在日曆上方的一個節點），視覺上讓這排按鈕出現在日曆
+  // 上方，而不是這個元件實際掛載的地方（日曆下方、清單的捲動容器裡）——按鈕本身的狀態、
+  // 點擊行為完全沒變，只是渲染輸出的落點不同。
+  const headerControls = (
+    <div className="flex-shrink-0">
       <div
         className="flex items-center justify-between mb-3 select-none"
         style={isCardsLayout ? undefined : { cursor: 'ns-resize', touchAction: 'none' }}
@@ -4293,12 +4361,21 @@ function TimelineSection({
           />
         </div>
       )}
-      </div>
+    </div>
+  );
+
+  return (
+    <div id="timeline-section-root" className="flex-1 min-h-0 flex flex-col">
+      {/* timeline 模式：跟以前一樣就地渲染在清單最上方。cards 模式：只有在 App() 已經把
+          portal 目標節點準備好（controlsPortalEl 不是 null）才渲染，避免節點還沒掛載前
+          按鈕先短暫出現在錯的位置（日曆下方）又跳走。 */}
+      {isCardsLayout
+        ? (controlsPortalEl ? createPortal(headerControls, controlsPortalEl) : null)
+        : headerControls}
 
       {/* 事件列表：獨立的捲動容器。timeline 模式（時光線分頁）維持原本的軸線＋往日地標收合區塊；
-          cards 模式（日程分頁）只保留卡片本身，不畫軸線、不顯示「往日地標」這個區塊——
-          資料（pastEvents／upcomingEvents／processedEvents）完全沒有另外處理，
-          只是這裡選擇要不要把它們渲染出來。 */}
+          cards 模式（日程分頁）只保留卡片本身，不畫軸線、不顯示「往日地標」這個區塊，改用
+          rangedEvents（跟著日曆目前選的月份／年份、以及「只展示未來代辦事件」開關）。 */}
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto pb-6">
         {isSearching ? (
           searchResults.length === 0 ? (
@@ -4313,17 +4390,12 @@ function TimelineSection({
               {searchResults.map(renderEventCard)}
             </div>
           )
-        ) : processedEvents.length === 0 ? (
-          <div className="py-8 pl-4">
-            <p style={{ color: INK, fontWeight: 'bold' }}>{t.emptyTimeline}</p>
-            <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
-          </div>
         ) : isCardsLayout ? (
-          // cards 模式：不畫軸線、不顯示「往日地標」收合區塊，只列出未來（含今天）的事件卡片。
-          // pastEvents 這份資料完全沒被動到，只是這裡不渲染它——之後「時光線」分頁一樣看得到。
-          upcomingEvents.length > 0 ? (
+          // cards 模式：不畫軸線、不顯示「往日地標」收合區塊，只列出目前日曆時間範圍內、
+          // 符合「只展示未來代辦事件」開關設定的事件卡片（見 rangedEvents）。
+          rangedEvents.length > 0 ? (
             <div className="flex flex-col" style={{ gap: EVENT_CARD_GAP }}>
-              {upcomingEvents.map(renderEventCard)}
+              {rangedEvents.map(renderEventCard)}
             </div>
           ) : (
             <div className="py-8">
@@ -4331,6 +4403,11 @@ function TimelineSection({
               <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
             </div>
           )
+        ) : processedEvents.length === 0 ? (
+          <div className="py-8 pl-4">
+            <p style={{ color: INK, fontWeight: 'bold' }}>{t.emptyTimeline}</p>
+            <p className="text-sm mt-1" style={{ color: INK_SOFT }}>{t.emptyTimelineSub}</p>
+          </div>
         ) : (
           <div className="relative pl-4 ml-2" style={{ zIndex: 0 }}>
             {/* 單一貫穿到底的軸線：改用一條絕對定位的線條元素，從收合按鈕最上面一路畫到
@@ -5870,13 +5947,16 @@ async function saveCloudDataBestEffort(uid, fullData) {
 }
 
 /* ---------------- 底部導覽列（手機版專用，桌面/大屏維持原本左右分欄，不套用這個） ---------------- */
-// 五個分頁固定順序：世界時鐘｜紀念日｜時光線｜圖片庫｜我的——「時光線」放在 5 個項目的正中間
-// （第 3 個），「紀念日」讓到第 2 個。中央「時光線」用品牌圖示
+// 五個分頁固定順序：世界時鐘｜日程｜時光線｜圖片庫｜我的——「時光線」放在 5 個項目的正中間
+// （第 3 個），「日程」讓到第 2 個。中央「時光線」用品牌圖示
 // （見 BOTTOM_NAV_LOGO_SRC 常數說明），其餘四個用 lucide-react 的簡潔線性圖示，
 // 跟專案其他地方（意見反饋視窗等）用的是同一套圖示庫，風格才不會分裂成兩套。
+// 「日程」原本用 Heart（紀念日語意），改版後日程頁以日曆為核心視覺，圖示也一併換成
+// Calendar，跟其餘圖示同樣是線性、同樣的粗細與尺寸，純粹換圖案，文字（t.navSchedule＝
+// 「日程」）完全不動。
 const BOTTOM_NAV_ITEMS = [
   { id: 'clock', icon: Globe, labelKey: 'worldClock' },
-  { id: 'schedule', icon: Heart, labelKey: 'navSchedule' },
+  { id: 'schedule', icon: Calendar, labelKey: 'navSchedule' },
   { id: 'home', icon: null, labelKey: null }, // 中央特殊處理，見下方渲染邏輯
   { id: 'gallery', icon: Images, labelKey: 'navGallery' },
   { id: 'profile', icon: User, labelKey: 'navProfile' },
@@ -5960,23 +6040,42 @@ function BottomNavigation({ activeTab, setActiveTab, t }) {
 // 相片本身仍然完全存在各自事件的 albums 欄位裡（events[].albums[].photos[]），這裡
 // 完全不建立、不複製任何新的照片資料，只是在畫面上把它們臨時攤平成一個陣列來顯示，
 // 不會影響、也不會取代原本「紀念日 → 某個事件 → 相冊」那一套既有的管理功能。
-/* ---------------- 紀念日分頁頂部的月曆（仿照參考圖：上面月曆、下面行程列表） ---------------- */
-// 完全複用既有的 getEffectiveDate()（已經處理好農曆／各種曆法／循環規則），對每個事件只算
-// 一次「從這個月第一天開始算，下一次會落在哪天」，落在目前顯示的月份裡才點一個標記，
-// 不用另外重新設計一套日期比對邏輯，也不會跟時間軸下面顯示的內容產生兩套不同的日期計算結果。
-// 點日期只是在月曆下面多顯示一小段「當天有哪些紀念日」的預覽，完全不會去過濾、修改下面
-// 那個原封不動的 TimelineSection 列表，兩者是各自獨立的兩塊內容。
-function AnniversaryCalendar({ events, lang, t, now }) {
-  const [viewDate, setViewDate] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
-  const [selectedDay, setSelectedDay] = useState(null);
-  // 收起／展開：預設展開。收起時只留月份標題列（含上下月切換），下面的月曆格子跟選中日
-  // 預覽整塊收合，讓下面的事件卡片能拿到更多空間——用 maxHeight+opacity 做轉場，
-  // 跟 FeedbackModal 裡輸入框放大/收合是同一套手法，200~260ms 的自然過渡。
-  const [collapsed, setCollapsed] = useState(false);
-  const CALENDAR_TRANSITION_MS = 260;
+/* ---------------- 日程分頁頂部的月曆／年曆（日曆是這個分頁的核心視覺，見需求文件二、八） ---------------- */
+// 完全複用既有的 getEffectiveDate()（已經處理好農曆／各種曆法／循環規則），對每個事件算
+// 「從指定參考日開始算，下一次會落在哪天」，落在目前顯示的月份（或年份，逐月掃 12 次）裡
+// 才點一個標記，不用另外重新設計一套日期比對邏輯。
+// 這個元件現在還多負責兩件事：① 支援直接選年份／月份跳頁，不用一直點上一月/下一月；
+// ② 把目前顯示的時間範圍（月或年）透過 onRangeChange 往上回報給 App，讓下面的日程列表
+// （TimelineSection layout="cards"）跟著這個範圍同步顯示，兩邊不會各自用不同的時間範圍。
+function AnniversaryCalendar({ events, lang, t, now, onRangeChange }) {
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth()); // 0-11，viewMode==='year' 時不使用
+  const [viewMode, setViewMode] = useState('month'); // 'month'＝月曆格子（原本的樣子）；'year'＝12 個月的年曆格子
+  const [selectedDay, setSelectedDay] = useState(null); // 只有月檢視才有意義，點日期在下面秀一小段當天預覽
 
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
+  // 年份／月份選擇面板：沿用「刪除地標」確認彈窗同一套置中卡片＋淡入淡出/位移縮放動畫
+  // （enter -> shown -> closing 三段式 phase），跟整個 App 目前所有彈窗是同一種呈現方式，
+  // 不另外發明這個 App 裡沒出現過的「由下往上彈出」樣式。
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerPhase, setPickerPhase] = useState('hidden');
+  const [pickerYear, setPickerYear] = useState(year); // 面板裡暫存的年份，選定月份或按下確定前不影響外面的日曆
+  const [pickerMode, setPickerMode] = useState('month'); // 面板裡的「月檢視／年檢視」分頁，開啟當下才同步目前的 viewMode
+  const PICKER_DURATION = 200;
+
+  function openPicker() {
+    setPickerYear(year);
+    setPickerMode(viewMode);
+    setPickerOpen(true);
+    setPickerPhase('enter');
+    requestAnimationFrame(() => setPickerPhase('shown'));
+  }
+  function closePicker() {
+    if (pickerPhase === 'closing') return;
+    setPickerPhase('closing');
+    setTimeout(() => { setPickerOpen(false); setPickerPhase('hidden'); }, PICKER_DURATION);
+  }
+  useModalBackClose(pickerOpen, closePicker);
+
   const firstOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startWeekday = firstOfMonth.getDay();
@@ -5991,12 +6090,57 @@ function AnniversaryCalendar({ events, lang, t, now }) {
     }
   });
 
+  // 年檢視：12 個月各自算一次「這個月有沒有落上任何事件」，跟月檢視同一套 getEffectiveDate 用法，
+  // 只是逐月掃描，不會跟月檢視或下面的日程列表算出兩套不同的日期判斷結果。
+  const monthsHaveEvents = Array.from({ length: 12 }, (_, m) => {
+    const ref = new Date(year, m, 1);
+    return events.some(ev => {
+      const occ = getEffectiveDate(ev, ref);
+      return occ.getFullYear() === year && occ.getMonth() === m;
+    });
+  });
+
   const weekdayLabels = Array.from({ length: 7 }, (_, i) =>
     new Intl.DateTimeFormat(LOCALE_MAP[lang], { weekday: 'short' }).format(new Date(2023, 0, 1 + i))
   );
+  const monthLabels = Array.from({ length: 12 }, (_, m) =>
+    new Intl.DateTimeFormat(LOCALE_MAP[lang], { month: 'short' }).format(new Date(2023, m, 1))
+  );
 
-  function goPrevMonth() { setViewDate(new Date(year, month - 1, 1)); setSelectedDay(null); }
-  function goNextMonth() { setViewDate(new Date(year, month + 1, 1)); setSelectedDay(null); }
+  // 日曆切換／捲動操作：月檢視是上一月/下一月，年檢視是上一年/下一年，兩顆按鈕現在放在
+  // 日曆右下角（見下方 JSX），不再堆在標題旁邊。
+  function goPrev() {
+    setSelectedDay(null);
+    if (viewMode === 'year') { setYear(y => y - 1); return; }
+    if (month === 0) { setYear(y => y - 1); setMonth(11); } else { setMonth(m => m - 1); }
+  }
+  function goNext() {
+    setSelectedDay(null);
+    if (viewMode === 'year') { setYear(y => y + 1); return; }
+    if (month === 11) { setYear(y => y + 1); setMonth(0); } else { setMonth(m => m + 1); }
+  }
+  // 選擇面板裡點了月份宮格：立即套用選定的年份＋月份、切到月檢視並關閉面板
+  function pickMonth(m) {
+    setYear(pickerYear);
+    setMonth(m);
+    setViewMode('month');
+    setSelectedDay(null);
+    closePicker();
+  }
+  // 只選年份、不指定月份：切到年檢視
+  function pickWholeYear() {
+    setYear(pickerYear);
+    setViewMode('year');
+    setSelectedDay(null);
+    closePicker();
+  }
+
+  // 日曆目前顯示的時間範圍（月或年）一有變動就同步給上層，下面的日程列表跟著這個範圍
+  // 即時更新（見需求六：日曆與日程列表不能各自使用不同的時間範圍）。
+  useEffect(() => {
+    onRangeChange && onRangeChange(viewMode === 'year' ? { mode: 'year', year } : { mode: 'month', year, month });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, year, month]);
 
   const cells = [];
   for (let i = 0; i < startWeekday; i++) cells.push({ day: daysInPrevMonth - startWeekday + 1 + i, inMonth: false });
@@ -6007,37 +6151,21 @@ function AnniversaryCalendar({ events, lang, t, now }) {
   const isToday = (d) => d === now.getDate() && month === now.getMonth() && year === now.getFullYear();
   const selectedEvents = selectedDay != null ? (eventsByDay[selectedDay] || []) : [];
 
+  const titleLabel = viewMode === 'year'
+    ? new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric' }).format(new Date(year, 0, 1))
+    : new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric', month: 'long' }).format(firstOfMonth);
+  const pickerYearLabel = new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric' }).format(new Date(pickerYear, 0, 1));
+
   return (
     <div className="rounded-2xl p-4 flex-shrink-0" style={glass()}>
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={goPrevMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronLeft size={18} /></button>
-        <button
-          onClick={() => setCollapsed(v => !v)}
-          className="flex items-center gap-1.5"
-        >
-          <span className="font-bold text-sm" style={{ color: INK }}>
-            {new Intl.DateTimeFormat(LOCALE_MAP[lang], { year: 'numeric', month: 'long' }).format(viewDate)}
-          </span>
-          <ChevronDown
-            size={14}
-            style={{
-              color: INK_SOFT,
-              transform: collapsed ? 'rotate(-90deg)' : 'none',
-              transition: `transform ${CALENDAR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
-            }}
-          />
-        </button>
-        <button onClick={goNextMonth} aria-label={t.back} style={{ color: INK_SOFT }}><ChevronRight size={18} /></button>
-      </div>
+      {/* 標題列：只留一顆按鈕（標題本身＋一個小箭頭），點開年份／月份選擇面板；
+          避免標題兩側同時塞「上一月」「收合」「下一月」三顆權重相同的按鈕。 */}
+      <button onClick={openPicker} className="flex items-center gap-1.5 mb-3" aria-label={t.calendarChooseDate}>
+        <span className="font-bold text-sm" style={{ color: INK }}>{titleLabel}</span>
+        <ChevronDown size={14} style={{ color: INK_SOFT }} />
+      </button>
 
-      <div
-        style={{
-          maxHeight: collapsed ? 0 : 420,
-          opacity: collapsed ? 0 : 1,
-          overflow: 'hidden',
-          transition: `max-height ${CALENDAR_TRANSITION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${CALENDAR_TRANSITION_MS * 0.7}ms ease`,
-        }}
-      >
+      {viewMode === 'month' ? (
         <div className="grid grid-cols-7 gap-y-1 text-center">
           {weekdayLabels.map((w, i) => (
             <span key={i} className="text-[10px] font-bold" style={{ color: INK_SOFT }}>{w}</span>
@@ -6073,22 +6201,147 @@ function AnniversaryCalendar({ events, lang, t, now }) {
             );
           })}
         </div>
+      ) : (
+        // 年檢視：12 個月排成 3x4 格子取代日格子，只標示「這個月有沒有事件」，
+        // 點一個月直接切回月檢視並定位到那個月（跟選擇面板裡點月份宮格是同一個函式 pickMonth）。
+        <div className="grid grid-cols-3 gap-2">
+          {monthLabels.map((label, m) => {
+            const isCurrentMonth = m === now.getMonth() && year === now.getFullYear();
+            return (
+              <button
+                key={m}
+                onClick={() => { setMonth(m); setViewMode('month'); setSelectedDay(null); }}
+                className="flex flex-col items-center justify-center py-3 rounded-xl"
+                style={{ background: isCurrentMonth ? 'var(--card-border)' : 'transparent' }}
+              >
+                <span className="text-sm font-bold" style={{ color: INK }}>{label}</span>
+                <span className="flex items-center justify-center mt-1" style={{ height: 4 }}>
+                  {monthsHaveEvents[m] && <span className="rounded-full" style={{ width: 4, height: 4, background: ACCENT }} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-        {selectedDay != null && (
-          <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: CARD_BORDER }}>
-            {selectedEvents.length === 0 ? (
-              <p className="text-xs text-center" style={{ color: INK_SOFT }}>—</p>
+      {viewMode === 'month' && selectedDay != null && (
+        <div className="mt-3 pt-3 flex flex-col gap-2" style={{ borderTop: CARD_BORDER }}>
+          {selectedEvents.length === 0 ? (
+            <p className="text-xs text-center" style={{ color: INK_SOFT }}>—</p>
+          ) : (
+            selectedEvents.map(ev => (
+              <div key={ev.id} className="flex items-center gap-2">
+                <span className="text-lg">{ev.icon}</span>
+                <span className="text-sm font-bold flex-1 truncate" style={{ color: INK }}>{ev.title}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* 日曆切換操作：改放右下角，只負責「往前一個／往後一個」，不再堆在標題旁邊（見需求四）。 */}
+      <div className="flex items-center justify-end gap-1 mt-3">
+        <button
+          onClick={goPrev}
+          aria-label={t.calendarPrev}
+          className="flex items-center justify-center rounded-full"
+          style={{ width: 28, height: 28, color: INK_SOFT, background: 'var(--card-border)' }}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <button
+          onClick={goNext}
+          aria-label={t.calendarNext}
+          className="flex items-center justify-center rounded-full"
+          style={{ width: 28, height: 28, color: INK_SOFT, background: 'var(--card-border)' }}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      {/* 年份／月份選擇面板（見需求五）：先選「月檢視／年檢視」，月檢視底下再選要跳去的月份
+          （12 宮格，點了立即套用並關閉面板），年檢視則只需要選年份，按「確定」套用。
+          這樣不論要跳到很久以前或很久以後的日期，都不用連續點好幾次上一月/下一月。 */}
+      {pickerOpen && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center px-6"
+          style={{
+            zIndex: 205,
+            background: pickerPhase === 'shown' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
+            opacity: pickerPhase === 'hidden' ? 0 : 1,
+            transition: `background ${PICKER_DURATION}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${PICKER_DURATION}ms ease`,
+          }}
+          onClick={closePicker}
+        >
+          <div
+            className="w-full max-w-xs p-4 rounded-2xl flex flex-col gap-3"
+            style={{
+              ...AUTH_GLASS,
+              opacity: pickerPhase === 'shown' ? 1 : 0,
+              transform: pickerPhase === 'shown' ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.97)',
+              transition: `opacity ${PICKER_DURATION}ms ease, transform ${PICKER_DURATION}ms cubic-bezier(0.34, 1.2, 0.64, 1)`,
+              willChange: 'opacity, transform',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold" style={{ color: INK }}>{t.calendarChooseDate}</span>
+              <button onClick={closePicker} aria-label={t.close} style={{ color: INK_SOFT }}><X size={16} /></button>
+            </div>
+
+            {/* 月檢視／年檢視分頁切換：兩個分頁互斥，跟語言／曆法那類 segmented control 是一樣的做法 */}
+            <div className="flex items-center rounded-xl p-1" style={{ background: 'var(--card-border)' }}>
+              {[{ id: 'month', label: t.calendarMonthView }, { id: 'year', label: t.calendarYearView }].map(opt => (
+                <button
+                  key={opt.id}
+                  onClick={() => setPickerMode(opt.id)}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold"
+                  style={{
+                    background: pickerMode === opt.id ? CARD_BG : 'transparent',
+                    color: pickerMode === opt.id ? INK : INK_SOFT,
+                    transition: 'background 150ms ease, color 150ms ease',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 年份選擇：月檢視／年檢視共用同一個年份步進器 */}
+            <div className="flex items-center justify-center gap-4">
+              <button onClick={() => setPickerYear(y => y - 1)} aria-label={t.calendarPrev} style={{ color: INK_SOFT }}><ChevronLeft size={18} /></button>
+              <span className="text-base font-black" style={{ color: INK, minWidth: '4.5rem', textAlign: 'center' }}>{pickerYearLabel}</span>
+              <button onClick={() => setPickerYear(y => y + 1)} aria-label={t.calendarNext} style={{ color: INK_SOFT }}><ChevronRight size={18} /></button>
+            </div>
+
+            {pickerMode === 'month' ? (
+              <div className="grid grid-cols-3 gap-2">
+                {monthLabels.map((label, m) => {
+                  const isCurrentSelection = viewMode === 'month' && pickerYear === year && m === month;
+                  return (
+                    <button
+                      key={m}
+                      onClick={() => pickMonth(m)}
+                      className="py-2 rounded-lg text-sm font-bold"
+                      style={{
+                        background: isCurrentSelection ? ACCENT : 'var(--card-border)',
+                        color: isCurrentSelection ? '#fff' : INK,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             ) : (
-              selectedEvents.map(ev => (
-                <div key={ev.id} className="flex items-center gap-2">
-                  <span className="text-lg">{ev.icon}</span>
-                  <span className="text-sm font-bold flex-1 truncate" style={{ color: INK }}>{ev.title}</span>
-                </div>
-              ))
+              <button onClick={pickWholeYear} className="py-2.5 rounded-xl text-sm font-bold" style={{ background: ACCENT, color: '#fff' }}>
+                {t.calendarConfirmYear}
+              </button>
             )}
           </div>
-        )}
-      </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -7051,6 +7304,23 @@ export default function App() {
   // 切換時（例如切去「圖片庫」再切回「時光線」）不會重新掛載 WorldClockSection／
   // TimelineSection，兩者的內部狀態（捲動位置、展開的相冊、搜尋關鍵字等）才不會被重置。
   const [activeTab, setActiveTab] = useState('home');
+  // 「日程」分頁（layout='cards'）專用的狀態，放在 App 這一層而不是 AnniversaryCalendar／
+  // TimelineSection 自己的 local state，理由跟 activeTab 一樣：分頁切走切回時不希望被重置，
+  // 而且日曆（AnniversaryCalendar）跟事件列表（TimelineSection）是兩個獨立元件，
+  // 「目前時間範圍」「只看未來」這兩個狀態要同時餵給兩邊，本來就得放在共同的上層。
+  // scheduleRange：日曆目前顯示的時間範圍，由 AnniversaryCalendar 的 onRangeChange 回報；
+  // 初始值先假設是「本月」，等 AnniversaryCalendar 掛載後的第一個 effect 就會立刻覆寫成
+  // 它自己算出的正確值（月檢視預設也是本月，兩者一致，不會有畫面閃一下又跳的情況）。
+  const [scheduleRange, setScheduleRange] = useState(() => ({ mode: 'month', year: nowTick.getFullYear(), month: nowTick.getMonth() }));
+  // 「只展示未來代辦事件」開關，預設開啟——跟改版前「預設只看未來、過去的收在收合區塊裡」
+  // 的行為最接近，使用者一進日程頁不會被過去／已發生的事件洗版。
+  const [scheduleFutureOnly, setScheduleFutureOnly] = useState(true);
+  // 「新增日程／搜尋」按鈕的實際掛載點：TimelineSection（cards 模式）用 createPortal 把
+  // 按鈕渲染到這個節點，讓它們在畫面上出現在日曆上方，而不是 TimelineSection 元件本身
+  // 所在的位置（日曆下方）。用 useState 而不是純 useRef，是因為 ref 在節點掛載瞬間拿到的
+  // 值不會觸發重新渲染，createPortal 需要拿到真正的 DOM 節點才能運作，改用 setState 當
+  // callback ref，節點一掛載就會重新渲染一次，讓 TimelineSection 那次渲染能拿到非 null 的值。
+  const [scheduleControlsEl, setScheduleControlsEl] = useState(null);
   const [pendingMerge, setPendingMerge] = useState(null); // { local, cloud } 需要使用者選擇時才會有值
   const [syncStatus, setSyncStatus] = useState(null); // null | 'syncing' | 'synced'
   const syncReadyRef = useRef(false); // 是否已經完成登入時的資料比對／合併，之後才開始自動推送變更
@@ -7765,14 +8035,57 @@ export default function App() {
                 </div>
               )}
 
-              {/* 日程（獨立分頁，原「紀念日」分頁更名）：上面是月曆（可收合，見 AnniversaryCalendar），
-                  下面是事件卡片列表——資料跟「時光線」共用同一份 events／處理邏輯，只是這裡傳
-                  layout="cards" 讓 TimelineSection 跳過時間軸視覺（軸線／圓點／往日地標區塊），
-                  改成單純的事件卡片。生日／陪伴／關懷／紀念日／常規五種模式、國曆農曆、
-                  相冊入口、新增／編輯／刪除全部原樣保留，只是不再顯示時間軸的視覺結構。 */}
+              {/* 日程（獨立分頁）：頁面結構由上至下＝頁面標題（在最上面的 Header，這裡看不到）→
+                  「新增日程／搜尋」操作 → 日曆 → 日程篩選設定（只展示未來代辦事件）→
+                  對應的日程／事件列表。日曆（AnniversaryCalendar）跟事件列表（TimelineSection，
+                  layout="cards"）資料共用同一份 events／處理邏輯，只是不再顯示時間軸的視覺結構，
+                  改成單純的事件卡片，且列表內容跟著日曆目前選的月份／年份同步（見需求二、六）。 */}
               {activeTab === 'schedule' && (
                 <div className="flex-1 min-h-0 flex flex-col gap-3">
-                  <AnniversaryCalendar events={events} lang={lang} t={t} now={now} />
+                  {/* 「新增日程／搜尋」按鈕的實際掛載點：內容由下面的 TimelineSection（cards 模式）
+                      透過 createPortal 掛進來，這裡只是預留一個節點，讓按鈕視覺上出現在日曆
+                      上方、彼此形成清楚的上下關係（見需求三）。 */}
+                  <div ref={setScheduleControlsEl} className="flex-shrink-0" />
+
+                  <AnniversaryCalendar events={events} lang={lang} t={t} now={now} onRangeChange={setScheduleRange} />
+
+                  {/* 日程篩選設定：「只展示未來代辦事件」＋開關，放在日曆與下方事件列表之間，
+                      沿用跟外層容器一致的 gap-3 垂直間距，不因為新增這一行而壓縮這個區域
+                      （見需求七）。開關樣式跟「新增地標」表單裡的「循環」開關同一套設計。 */}
+                  <div className="rounded-2xl px-4 py-3 flex items-center justify-between flex-shrink-0" style={glass()}>
+                    <span className="text-sm font-bold" style={{ color: INK }}>{t.futureOnlyLabel}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={scheduleFutureOnly}
+                      aria-label={t.futureOnlyLabel}
+                      onClick={() => setScheduleFutureOnly(v => !v)}
+                      className="relative flex-shrink-0 rounded-full"
+                      style={{
+                        width: 46,
+                        height: 28,
+                        padding: 3,
+                        background: scheduleFutureOnly ? ACCENT : 'rgba(120,125,135,0.22)',
+                        border: scheduleFutureOnly ? `1px solid ${ACCENT}` : '1px solid rgba(120,125,135,0.16)',
+                        boxShadow: scheduleFutureOnly ? `0 3px 10px ${accentAlpha('30')}` : 'inset 0 1px 2px rgba(0,0,0,0.06)',
+                        transition: 'background 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
+                      }}
+                    >
+                      <span
+                        className="absolute rounded-full"
+                        style={{
+                          width: 20,
+                          height: 20,
+                          top: 3,
+                          left: scheduleFutureOnly ? 22 : 3,
+                          background: '#fff',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                          transition: 'left 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+                        }}
+                      />
+                    </button>
+                  </div>
+
                   <div className="flex-1 min-h-0 overflow-y-auto">
                     <TimelineSection
                       events={events}
@@ -7787,6 +8100,9 @@ export default function App() {
                       setViewingId={setViewingId}
                       onOpenAlbumForEvent={openAlbumsForEvent}
                       layout="cards"
+                      controlsPortalEl={scheduleControlsEl}
+                      rangeFilter={scheduleRange}
+                      futureOnly={scheduleFutureOnly}
                     />
                   </div>
                 </div>
