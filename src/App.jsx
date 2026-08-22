@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, X, MapPin, Check, Clock, Globe, Sun, Moon, Pencil, User, LogOut, Mail, Eye, EyeOff, Search, SlidersHorizontal, Share2, Bell, BellOff, Settings, Images, Move } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, X, MapPin, Check, Clock, Globe, Sun, Moon, Pencil, User, LogOut, Mail, Eye, EyeOff, Search, SlidersHorizontal, Share2, Bell, BellOff, Settings, Images, Move, Heart } from 'lucide-react';
 import {
   watchAuthState, signUpWithEmail, signInWithEmail, signInWithGoogle, signInWithApple,
   sendMagicLink, completeEmailLinkSignInIfNeeded, signOutUser,
@@ -40,6 +40,15 @@ const MINT = '#3FBF9B';
 const CARD_BG = 'var(--card-bg)';
 const CARD_BORDER = '1px solid var(--card-border)';
 const INPUT_BG = 'var(--input-bg)';
+
+// 底部導覽列中央「時光線」分頁的品牌圖示素材路徑（預留位置）。
+// 依需求：不能用現有的 /icon-512.png（那是 App 圖示本人，跟這裡要求的「另一份專門給
+// Bottom Navigation 用的 Logo 素材」是兩回事），也不能自行畫一個代替。這裡只先訂好
+// 檔名／路徑當作明確的引用位置，實際素材檔案請放到 public/nav-logo.png（跟
+// public/icon-512.png 同一層）。BottomNavigation 元件會先嘗試載入這個路徑，
+// 檔案還沒放上去之前，會自動 fallback 成一個中性的實心圓點佔位（不是刻意畫的替代 Logo，
+// 純粹是「這裡以後會有東西」的視覺佔位），素材一到位就會自動換成正式的圖檔，不用再改程式碼。
+const BOTTOM_NAV_LOGO_SRC = '/nav-logo.png';
 
 // 關懷模式的視覺語言：改用「設計 token（CSS 變數）覆寫」取代舊版的
 // `filter: grayscale(1)`。差別在於 filter 是對整個 DOM 子樹做像素等級的去色處理，
@@ -376,6 +385,9 @@ const STRINGS = {
     repeatLabel: '重複', every: '每', unitYear: '年', unitMonth: '個月',
     modeSelectLabel: '模式選擇',
     modeBirthday: '生日', modeCompanion: '陪伴', modeCare: '關懷', modeAnniversary: '紀念日', modeRegular: '常規',
+    navAnniversary: '紀念日', navGallery: '圖片庫', navProfile: '我的', myPageTitle: '我的',
+    darkModeLabel: '深色模式', darkModeOn: '開', darkModeOff: '關', feedbackLabel: '意見回饋',
+    galleryEmpty: '目前還沒有任何相片，先到紀念日事件裡新增幾張吧', galleryFrom: e => `來自：${e}`,
     modeCompanionHint: '設定情誼開始的日子，得到你們相伴的時長。',
     modeAnniversaryHint: '設定一個值得銘記的日子，讓時光線替你記錄一路點滴。',
     modeRegularHint: '不做修飾，只記錄時間。',
@@ -469,6 +481,9 @@ const STRINGS = {
     repeatLabel: 'Repeat', every: 'Every', unitYear: 'year(s)', unitMonth: 'month(s)',
     modeSelectLabel: 'Mode',
     modeBirthday: 'Birthday', modeCompanion: 'Companion', modeCare: 'Care', modeAnniversary: 'Anniversary', modeRegular: 'Regular',
+    navAnniversary: 'Anniversary', navGallery: 'Gallery', navProfile: 'Profile', myPageTitle: 'Profile',
+    darkModeLabel: 'Dark Mode', darkModeOn: 'On', darkModeOff: 'Off', feedbackLabel: 'Feedback',
+    galleryEmpty: 'No photos yet — add some inside an anniversary event first', galleryFrom: e => `From: ${e}`,
     modeCompanionHint: "Set the day your bond began, and see how long you've been together.",
     modeAnniversaryHint: 'Set a day worth remembering, and let TimeLine track every moment along the way.',
     modeRegularHint: 'No embellishment — just keeping track of time.',
@@ -562,6 +577,9 @@ const STRINGS = {
     repeatLabel: '繰り返し', every: '毎', unitYear: '年', unitMonth: 'ヶ月',
     modeSelectLabel: 'モード選択',
     modeBirthday: '誕生日', modeCompanion: '寄り添い', modeCare: '追悼', modeAnniversary: '記念日', modeRegular: '通常',
+    navAnniversary: '記念日', navGallery: 'アルバム', navProfile: 'マイページ', myPageTitle: 'マイページ',
+    darkModeLabel: 'ダークモード', darkModeOn: 'オン', darkModeOff: 'オフ', feedbackLabel: 'フィードバック',
+    galleryEmpty: 'まだ写真がありません。まず記念日イベントの中で写真を追加してください', galleryFrom: e => `${e} より`,
     modeCompanionHint: '絆が始まった日を設定して、二人が共に過ごした時間を確認しましょう。',
     modeAnniversaryHint: '心に刻みたい日を設定すれば、時間軸がここまでの歩みをそっと記録します。',
     modeRegularHint: '飾らず、ただ時間だけを記録します。',
@@ -655,6 +673,9 @@ const STRINGS = {
     repeatLabel: '반복', every: '매', unitYear: '년', unitMonth: '개월',
     modeSelectLabel: '모드 선택',
     modeBirthday: '생일', modeCompanion: '동반', modeCare: '추모', modeAnniversary: '기념일', modeRegular: '일반',
+    navAnniversary: '기념일', navGallery: '갤러리', navProfile: '마이페이지', myPageTitle: '마이페이지',
+    darkModeLabel: '다크 모드', darkModeOn: '켜짐', darkModeOff: '꺼짐', feedbackLabel: '피드백',
+    galleryEmpty: '아직 사진이 없어요. 먼저 기념일 이벤트 안에서 사진을 추가해 보세요', galleryFrom: e => `출처: ${e}`,
     modeCompanionHint: '인연이 시작된 날을 설정하고 함께한 시간을 확인해 보세요.',
     modeAnniversaryHint: '기억하고 싶은 날을 설정하면 타임라인이 그동안의 발자취를 기록해 줍니다.',
     modeRegularHint: '꾸밈없이 시간만 기록합니다.',
@@ -6572,6 +6593,226 @@ async function saveCloudDataBestEffort(uid, fullData) {
   }
 }
 
+/* ---------------- 底部導覽列（手機版專用，桌面/大屏維持原本左右分欄，不套用這個） ---------------- */
+// 五個分頁固定順序：世界時鐘｜時光線｜紀念日｜圖片庫｜我的。中央「時光線」用品牌圖示
+// （見 BOTTOM_NAV_LOGO_SRC 常數說明），其餘四個用 lucide-react 的簡潔線性圖示，
+// 跟專案其他地方（意見反饋視窗等）用的是同一套圖示庫，風格才不會分裂成兩套。
+const BOTTOM_NAV_ITEMS = [
+  { id: 'clock', icon: Globe, labelKey: 'worldClock' },
+  { id: 'home', icon: null, labelKey: null }, // 中央特殊處理，見下方渲染邏輯
+  { id: 'anniversary', icon: Heart, labelKey: 'navAnniversary' },
+  { id: 'gallery', icon: Images, labelKey: 'navGallery' },
+  { id: 'profile', icon: User, labelKey: 'navProfile' },
+];
+
+function BottomNavLogo({ active }) {
+  // 品牌圖示素材還沒放上去之前，用一個中性的實心圓點佔位（不是刻意畫的替代 Logo），
+  // 圖片載入失敗時自動切換回這個佔位，素材一到位就會自動顯示正式圖檔。
+  const [imgFailed, setImgFailed] = useState(false);
+  if (imgFailed) {
+    return (
+      <div
+        className="rounded-full flex-shrink-0"
+        style={{ width: 22, height: 22, background: active ? ACCENT : 'var(--card-border)', transition: 'background 150ms ease' }}
+      />
+    );
+  }
+  return (
+    <img
+      src={BOTTOM_NAV_LOGO_SRC}
+      alt=""
+      onError={() => setImgFailed(true)}
+      className="flex-shrink-0"
+      style={{ width: 24, height: 24, objectFit: 'contain', opacity: active ? 1 : 0.55, transition: 'opacity 150ms ease' }}
+    />
+  );
+}
+
+function BottomNavigation({ activeTab, setActiveTab, t }) {
+  return (
+    <nav
+      className="flex-shrink-0"
+      style={{
+        position: 'relative',
+        zIndex: 30,
+        background: 'var(--header-bg)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        borderTop: CARD_BORDER,
+        // iOS Safe Area／Android 手勢導覽區：跟 Header 頂部安全區同一套做法（env() 在沒有
+        // 安全區概念的環境下是 0，不影響一般網頁版），底部再固定留一點基礎間距。
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      <div className="max-w-md mx-auto w-full flex items-stretch justify-between px-2">
+        {BOTTOM_NAV_ITEMS.map(item => {
+          const active = activeTab === item.id;
+          const isCenter = item.id === 'home';
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-2"
+              style={{ minWidth: 0 }}
+            >
+              {isCenter ? (
+                <BottomNavLogo active={active} />
+              ) : (
+                <Icon size={20} style={{ color: active ? ACCENT : INK_SOFT, transition: 'color 150ms ease' }} strokeWidth={active ? 2.4 : 2} />
+              )}
+              <span
+                className="text-[10px] truncate"
+                style={{
+                  color: active ? ACCENT : INK_SOFT,
+                  fontWeight: active ? 700 : 500,
+                  maxWidth: '100%',
+                }}
+              >
+                {isCenter ? '時光線' : t[item.labelKey]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/* ---------------- 圖片庫（跨事件的相片聚合瀏覽，第一版：只做聚合展示＋單張放大預覽） ---------------- */
+// 相片本身仍然完全存在各自事件的 albums 欄位裡（events[].albums[].photos[]），這裡
+// 完全不建立、不複製任何新的照片資料，只是在畫面上把它們臨時攤平成一個陣列來顯示，
+// 不會影響、也不會取代原本「紀念日 → 某個事件 → 相冊」那一套既有的管理功能。
+function GalleryPage({ events, t }) {
+  const [viewingPhoto, setViewingPhoto] = useState(null); // { dataUrl, eventTitle, albumName } | null
+
+  const allPhotos = events.flatMap(ev =>
+    (ev.albums || []).flatMap(al =>
+      (al.photos || []).map(p => ({
+        id: `${ev.id}-${al.id}-${p.id}`,
+        dataUrl: p.dataUrl,
+        eventTitle: ev.title,
+        albumName: al.name,
+      }))
+    )
+  );
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+      {allPhotos.length === 0 ? (
+        <p className="text-sm text-center py-10" style={{ color: INK_SOFT }}>{t.galleryEmpty}</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {allPhotos.map(photo => (
+            <button
+              key={photo.id}
+              onClick={() => setViewingPhoto(photo)}
+              className="aspect-square rounded-xl overflow-hidden"
+              style={{ border: CARD_BORDER }}
+            >
+              <img src={photo.dataUrl} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 單張放大預覽：顯示相片來自哪個紀念日／哪個相冊，方便追溯，但不提供編輯／刪除——
+          相片的新增、移動、刪除一律回到原本的紀念日相冊裡操作，圖片庫只負責瀏覽。 */}
+      {viewingPhoto && (
+        <div
+          className="fixed inset-0 flex flex-col items-center justify-center px-6"
+          style={{ zIndex: 200, background: 'rgba(0,0,0,0.85)' }}
+          onClick={() => setViewingPhoto(null)}
+        >
+          <button
+            onClick={() => setViewingPhoto(null)}
+            className="absolute flex items-center justify-center rounded-full"
+            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 36, height: 36, background: 'rgba(255,255,255,0.15)', color: '#fff' }}
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={viewingPhoto.dataUrl}
+            alt=""
+            onClick={e => e.stopPropagation()}
+            className="max-w-[88vw] max-h-[70vh] rounded-lg object-contain"
+          />
+          <div className="mt-4 text-center" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-bold" style={{ color: '#fff' }}>{viewingPhoto.eventTitle}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.65)' }}>{t.galleryFrom(viewingPhoto.albumName)}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- 我的（帳號、提醒、意見反饋、深色模式、語言，原本全部散在 Header 上） ---------------- */
+// 這裡刻意不重寫任何一個按鈕的內部邏輯，AuthModal／NotifySettingsButton／FeedbackModal／
+// LangSwitcher 的觸發方式、狀態、彈窗行為都原封不動，只是把觸發它們的按鈕從 Header
+// 搬進這裡、排成一列可讀性更高的清單，而不是擠在 Header 右上角的一排小圖示。
+function ProfileRow({ icon, label, onClick, danger, right }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-4 rounded-2xl text-left"
+      style={{ ...glass(), color: danger ? DANGER : INK }}
+    >
+      {icon}
+      <span className="flex-1 text-sm font-bold">{label}</span>
+      {right}
+    </button>
+  );
+}
+
+function ProfilePage({
+  t, fbUser, localSaveError, syncStatus, onOpenAuth,
+  notifyEnabled, onToggleNotify, notifyDaysBefore, setNotifyDaysBefore, notifyPermission,
+  onOpenFeedback, isDark, setIsDark, lang, setLang,
+}) {
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto pb-4 flex flex-col gap-3">
+      <ProfileRow
+        icon={
+          <span className="relative flex-shrink-0" style={{ color: fbUser ? MINT : INK }}>
+            <User size={18} />
+            {(localSaveError || syncStatus === 'error') && (
+              <span className="absolute rounded-full" style={{ width: 8, height: 8, top: -1, right: -1, background: DANGER, border: '1.5px solid var(--card-bg)' }} />
+            )}
+          </span>
+        }
+        label={fbUser ? t.loggedInAs(fbUser.email || fbUser.displayName || '') : t.loginToSync}
+        onClick={onOpenAuth}
+      />
+
+      <div className="rounded-2xl p-3 flex items-center justify-between" style={glass()}>
+        <span className="text-sm font-bold" style={{ color: INK }}>{t.notifyButtonLabel}</span>
+        <NotifySettingsButton
+          enabled={notifyEnabled}
+          onToggle={onToggleNotify}
+          daysBefore={notifyDaysBefore}
+          setDaysBefore={setNotifyDaysBefore}
+          permission={notifyPermission}
+          t={t}
+        />
+      </div>
+
+      <ProfileRow icon={<Mail size={18} />} label={t.feedbackLabel} onClick={onOpenFeedback} />
+
+      <ProfileRow
+        icon={isDark ? <Sun size={18} /> : <Moon size={18} />}
+        label={`${t.darkModeLabel}（${isDark ? t.darkModeOn : t.darkModeOff}）`}
+        onClick={() => setIsDark(v => !v)}
+      />
+
+      <div className="rounded-2xl p-3 flex items-center justify-between" style={glass()}>
+        <span className="text-sm font-bold" style={{ color: INK }}>{LANG_NAMES[lang]}</span>
+        <LangSwitcher lang={lang} setLang={setLang} />
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Main App Component ---------------- */
 
 export default function App() {
@@ -6711,6 +6952,11 @@ export default function App() {
   const [fbUser, setFbUser] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  // 底部導覽列目前所在分頁，只在手機版（!isLargeScreen）有作用；大屏維持原本左右分欄，
+  // 完全不看這個 state。放在 App 這一層而不是各分頁自己的 local state，是因為分頁互相
+  // 切換時（例如切去「圖片庫」再切回「時光線」）不會重新掛載 WorldClockSection／
+  // TimelineSection，兩者的內部狀態（捲動位置、展開的相冊、搜尋關鍵字等）才不會被重置。
+  const [activeTab, setActiveTab] = useState('home');
   const [pendingMerge, setPendingMerge] = useState(null); // { local, cloud } 需要使用者選擇時才會有值
   const [syncStatus, setSyncStatus] = useState(null); // null | 'syncing' | 'synced'
   const syncReadyRef = useRef(false); // 是否已經完成登入時的資料比對／合併，之後才開始自動推送變更
@@ -7239,52 +7485,55 @@ export default function App() {
             <h1 className="text-2xl font-black tracking-tight" style={{ color: INK }}>{t[greeting.key]} {greeting.emoji}</h1>
             <p className="text-xs font-medium mt-1" style={{ color: INK_SOFT }}>{t.todayIs(todayStr)}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="relative flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: fbUser ? MINT : INK }}
-              title={
-                localSaveError || syncStatus === 'error'
-                  ? t.syncErrorHint
-                  : (fbUser ? t.loggedInAs(fbUser.email || fbUser.displayName || '') : t.loginToSync)
-              }
-            >
-              <User size={16} />
-              {/* 本機或雲端最近一次寫入失敗時，用一個小紅點提示——之前失敗只會靜靜印在 console，
-                  使用者完全看不到，這裡讓「有沒有真的存上」變得至少有一點可見。 */}
-              {(localSaveError || syncStatus === 'error') && (
-                <span
-                  className="absolute rounded-full"
-                  style={{ width: 9, height: 9, top: -1, right: -1, background: DANGER, border: '1.5px solid var(--card-bg)' }}
-                />
-              )}
-            </button>
-            <NotifySettingsButton
-              enabled={notifyEnabled}
-              onToggle={handleToggleNotify}
-              daysBefore={notifyDaysBefore}
-              setDaysBefore={setNotifyDaysBefore}
-              permission={notifyPermission}
-              t={t}
-            />
-            <button
-              onClick={() => setShowFeedbackModal(true)}
-              className="flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
-              title="意見回饋"
-            >
-              <Mail size={16} />
-            </button>
-            <button
-              onClick={() => setIsDark(v => !v)}
-              className="flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
-            >
-              {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-            <LangSwitcher lang={lang} setLang={setLang} />
-          </div>
+          {/* 帳號／提醒／意見回饋／深色模式／語言這排圖示，手機版已經整組搬進「我的」分頁
+              （見 ProfilePage），Header 精簡到只剩問候語；大屏（isLargeScreen）沒有底部導覽列，
+              維持原本的做法，這排圖示照舊留在 Header 上，不受這次重構影響。 */}
+          {isLargeScreen && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="relative flex items-center justify-center rounded-full flex-shrink-0"
+                style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: fbUser ? MINT : INK }}
+                title={
+                  localSaveError || syncStatus === 'error'
+                    ? t.syncErrorHint
+                    : (fbUser ? t.loggedInAs(fbUser.email || fbUser.displayName || '') : t.loginToSync)
+                }
+              >
+                <User size={16} />
+                {(localSaveError || syncStatus === 'error') && (
+                  <span
+                    className="absolute rounded-full"
+                    style={{ width: 9, height: 9, top: -1, right: -1, background: DANGER, border: '1.5px solid var(--card-bg)' }}
+                  />
+                )}
+              </button>
+              <NotifySettingsButton
+                enabled={notifyEnabled}
+                onToggle={handleToggleNotify}
+                daysBefore={notifyDaysBefore}
+                setDaysBefore={setNotifyDaysBefore}
+                permission={notifyPermission}
+                t={t}
+              />
+              <button
+                onClick={() => setShowFeedbackModal(true)}
+                className="flex items-center justify-center rounded-full flex-shrink-0"
+                style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
+                title="意見回饋"
+              >
+                <Mail size={16} />
+              </button>
+              <button
+                onClick={() => setIsDark(v => !v)}
+                className="flex items-center justify-center rounded-full flex-shrink-0"
+                style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
+              >
+                {isDark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              <LangSwitcher lang={lang} setLang={setLang} />
+            </div>
+          )}
         </header>
 
         {/* Main Content */}
@@ -7331,40 +7580,113 @@ export default function App() {
             </div>
           </main>
         ) : (
-          /* 手機直向：維持原本上下排列——世界時鐘固定在上方，時間軸在下方獨立捲動容器 */
-          <main className="px-6 max-w-md mx-auto w-full flex-1 min-h-0 flex flex-col">
-            <div id="world-clock-section-root" className="flex-shrink-0">
-              <WorldClockSection
-                clocks={clocks}
-                setClocks={setClocks}
-                lang={lang}
-                t={t}
-                onHomeTzChange={setHomeTz}
-                homeTzId={homeTzId}
-                setHomeTzId={setHomeTzId}
-                part2Ref={worldClockPart2Ref}
-                part2Height={worldClockPart2VisibleHeight}
-                isDraggingWorldClock={isDraggingWorldClock}
-                clockModalOpen={clockModalOpen}
-                setClockModalOpen={openClockModalSafe}
-              />
-            </div>
-            <TimelineSection
-              events={events}
-              setEvents={setEvents}
-              lang={lang}
-              t={t}
-              now={now}
-              isDark={isDark}
-              customIcons={customIcons}
-              setCustomIcons={setCustomIcons}
-              onHeaderDragStart={handleWorldClockDragStart}
-              onHeaderDragMove={handleWorldClockDragMove}
-              onHeaderDragEnd={handleWorldClockDragEnd}
-              viewingId={viewingId}
-              setViewingId={setViewingIdSafe}
-            />
-          </main>
+          /* 手機版：五個分頁的底部導覽列架構。
+             「時光線」＝原本的複合式首頁（世界時鐘＋時間軸＋拖曳調整比例），完整保留、
+             一個字都沒改，只是用 display:'contents' 切換可見度，不是條件渲染整個拔除——
+             這樣切去其他分頁再切回來時，裡面的捲動位置、搜尋關鍵字、拖曳調整過的高度比例
+             都還在，不會被重新掛載重置掉。其餘四個分頁（世界時鐘／紀念日／圖片庫／我的）
+             各自是獨立、專注單一功能的頁面，離開再回來時內部小狀態（例如捲動位置）重置是
+             正常、預期中的行為，跟大部分 App 的分頁一樣，不影響任何實際資料。 */
+          <>
+            <main className="px-6 max-w-md mx-auto w-full flex-1 min-h-0 flex flex-col">
+              <div style={{ display: activeTab === 'home' ? 'contents' : 'none' }}>
+                <div id="world-clock-section-root" className="flex-shrink-0">
+                  <WorldClockSection
+                    clocks={clocks}
+                    setClocks={setClocks}
+                    lang={lang}
+                    t={t}
+                    onHomeTzChange={setHomeTz}
+                    homeTzId={homeTzId}
+                    setHomeTzId={setHomeTzId}
+                    part2Ref={worldClockPart2Ref}
+                    part2Height={worldClockPart2VisibleHeight}
+                    isDraggingWorldClock={isDraggingWorldClock}
+                    clockModalOpen={clockModalOpen}
+                    setClockModalOpen={openClockModalSafe}
+                  />
+                </div>
+                <TimelineSection
+                  events={events}
+                  setEvents={setEvents}
+                  lang={lang}
+                  t={t}
+                  now={now}
+                  isDark={isDark}
+                  customIcons={customIcons}
+                  setCustomIcons={setCustomIcons}
+                  onHeaderDragStart={handleWorldClockDragStart}
+                  onHeaderDragMove={handleWorldClockDragMove}
+                  onHeaderDragEnd={handleWorldClockDragEnd}
+                  viewingId={viewingId}
+                  setViewingId={setViewingIdSafe}
+                />
+              </div>
+
+              {/* 世界時鐘（獨立分頁）：跟大屏那邊同一個做法，unlimitedHeight 讓它不用再
+                  像複合首頁那樣被高度上限卡住，城市／時區／排序／新增刪除等功能完全不動。 */}
+              {activeTab === 'clock' && (
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <WorldClockSection
+                    clocks={clocks}
+                    setClocks={setClocks}
+                    lang={lang}
+                    t={t}
+                    onHomeTzChange={setHomeTz}
+                    homeTzId={homeTzId}
+                    setHomeTzId={setHomeTzId}
+                    unlimitedHeight
+                    clockModalOpen={clockModalOpen}
+                    setClockModalOpen={openClockModalSafe}
+                  />
+                </div>
+              )}
+
+              {/* 紀念日（獨立分頁）：不傳 onHeaderDragStart/Move/End，元件內部已經用
+                  `onHeaderDragStart && ...` 這種寫法保護過，不傳就自然是無操作，不會報錯。
+                  生日／陪伴／關懷／紀念日／常規五種模式、國曆農曆、相冊入口全部原樣保留，
+                  只是拿到全螢幕高度、不用再跟世界時鐘擠在同一屏。 */}
+              {activeTab === 'anniversary' && (
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <TimelineSection
+                    events={events}
+                    setEvents={setEvents}
+                    lang={lang}
+                    t={t}
+                    now={now}
+                    isDark={isDark}
+                    customIcons={customIcons}
+                    setCustomIcons={setCustomIcons}
+                    viewingId={viewingId}
+                    setViewingId={setViewingIdSafe}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'gallery' && <GalleryPage events={events} t={t} />}
+
+              {activeTab === 'profile' && (
+                <ProfilePage
+                  t={t}
+                  fbUser={fbUser}
+                  localSaveError={localSaveError}
+                  syncStatus={syncStatus}
+                  onOpenAuth={() => setShowAuthModal(true)}
+                  notifyEnabled={notifyEnabled}
+                  onToggleNotify={handleToggleNotify}
+                  notifyDaysBefore={notifyDaysBefore}
+                  setNotifyDaysBefore={setNotifyDaysBefore}
+                  notifyPermission={notifyPermission}
+                  onOpenFeedback={() => setShowFeedbackModal(true)}
+                  isDark={isDark}
+                  setIsDark={setIsDark}
+                  lang={lang}
+                  setLang={setLang}
+                />
+              )}
+            </main>
+            <BottomNavigation activeTab={activeTab} setActiveTab={setActiveTab} t={t} />
+          </>
         )}
       </div>
       {showAuthModal && (
@@ -7382,7 +7704,12 @@ export default function App() {
         <div
           className="fixed left-1/2 px-4 py-3 rounded-xl text-sm font-bold text-center shadow-lg"
           style={{
-            bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+            // 手機版底下多了一條 Bottom Navigation，這個提示條原本貼著螢幕底部，
+            // 現在要往上讓開導覽列的高度（含安全區），不然兩者會疊在一起。
+            // 大屏沒有底部導覽列，維持原本的間距不變。
+            bottom: isLargeScreen
+              ? 'calc(24px + env(safe-area-inset-bottom, 0px))'
+              : 'calc(80px + env(safe-area-inset-bottom, 0px))',
             transform: 'translateX(-50%)',
             zIndex: 100,
             maxWidth: '90vw',
