@@ -385,9 +385,8 @@ const STRINGS = {
     repeatLabel: '重複', every: '每', unitYear: '年', unitMonth: '個月',
     modeSelectLabel: '模式選擇',
     modeBirthday: '生日', modeCompanion: '陪伴', modeCare: '關懷', modeAnniversary: '紀念日', modeRegular: '常規',
-    navSchedule: '日程', navGallery: '圖片庫', navProfile: '我的', myPageTitle: '我的', addSchedule: '添加日程',
+    navSchedule: '日程', navGallery: '相冊', navProfile: '我的', myPageTitle: '我的', addSchedule: '添加日程',
     darkModeLabel: '深色模式', darkModeOn: '開', darkModeOff: '關', feedbackLabel: '意見回饋',
-    galleryEmpty: '目前還沒有任何相片，先到紀念日事件裡新增幾張吧', galleryFrom: e => `來自：${e}`,
     modeCompanionHint: '設定情誼開始的日子，得到你們相伴的時長。',
     modeAnniversaryHint: '設定一個值得銘記的日子，讓時光線替你記錄一路點滴。',
     modeRegularHint: '不做修飾，只記錄時間。',
@@ -405,6 +404,12 @@ const STRINGS = {
     noAlbumsYet: '尚未建立相冊，先建立一個吧', noPhotosYet: '這個相冊還沒有相片，點一下新增',
     addPhoto: '新增相片', deleteAlbum: '刪除相冊', deletePhoto: '刪除相片', confirmRename: '確認更名', moveTo: '移到',
     albumPhotoUploadError: '相片上傳失敗，請換一張再試一次', renameAlbum: '重新命名相冊', syncErrorHint: '最近一次儲存失敗，資料可能量太大，請稍後再試',
+    createAlbumBtn: '＋ 建立相冊', albumFilterAll: '全部', albumFilterLinked: '事件相冊', albumFilterUnlinked: '未關聯',
+    albumHomeEmpty: '尚未建立相冊，先建立第一本，保存你的回憶吧', albumPhotoCount: n => `${n} 張照片`,
+    linkedEventBadge: e => `⌁ ${e}`, selectPhotosStepTitle: '選擇照片', selectPhotosHint: '從裝置圖片庫選擇一張或多張照片開始',
+    selectedPhotosCount: n => `已選擇 ${n} 張照片`, nextStep: '下一步', createAlbumStepTitle: '建立相冊',
+    albumNameLabel: '相冊名稱', linkEventLabel: '關聯事件', noLinkEvent: '不關聯事件', linkOptionNew: '從這裡建立新事件',
+    eventPickerTitle: '選擇事件', moreActions: '更多操作', back: '返回', quickEventTitle: '建立新事件',
     deleteLandmarkConfirmTitle: '刪除這個地標？', deleteLandmarkConfirmDesc: title => `如您未進行本機備份，此動作無法復原，確定要刪除「${title}」嗎？`, confirmDeleteLandmark: '確認刪除', cancelDeleteLandmark: '取消操作',
     notifyButtonLabel: '倒數日提醒', notifyPanelTitle: '倒數日提醒設定',
     notifyEnableLabel: '啟用系統通知', notifyEnableHint: '需要保持這個網頁／App 開著（背景分頁也可以）才能收到通知',
@@ -481,9 +486,8 @@ const STRINGS = {
     repeatLabel: 'Repeat', every: 'Every', unitYear: 'year(s)', unitMonth: 'month(s)',
     modeSelectLabel: 'Mode',
     modeBirthday: 'Birthday', modeCompanion: 'Companion', modeCare: 'Care', modeAnniversary: 'Anniversary', modeRegular: 'Regular',
-    navSchedule: 'Schedule', navGallery: 'Gallery', navProfile: 'Profile', myPageTitle: 'Profile', addSchedule: 'Add Schedule',
+    navSchedule: 'Schedule', navGallery: 'Albums', navProfile: 'Profile', myPageTitle: 'Profile', addSchedule: 'Add Schedule',
     darkModeLabel: 'Dark Mode', darkModeOn: 'On', darkModeOff: 'Off', feedbackLabel: 'Feedback',
-    galleryEmpty: 'No photos yet — add some inside an anniversary event first', galleryFrom: e => `From: ${e}`,
     modeCompanionHint: "Set the day your bond began, and see how long you've been together.",
     modeAnniversaryHint: 'Set a day worth remembering, and let TimeLine track every moment along the way.',
     modeRegularHint: 'No embellishment — just keeping track of time.',
@@ -501,6 +505,12 @@ const STRINGS = {
     noAlbumsYet: 'No albums yet — create one to get started', noPhotosYet: 'No photos in this album yet — tap to add one',
     addPhoto: 'Add Photo', deleteAlbum: 'Delete Album', deletePhoto: 'Delete Photo', confirmRename: 'Confirm Rename', moveTo: 'Move to',
     albumPhotoUploadError: 'Could not upload that photo — please try another one', renameAlbum: 'Rename Album', syncErrorHint: 'Last save failed — the data may be too large, please try again later',
+    createAlbumBtn: '+ New Album', albumFilterAll: 'All', albumFilterLinked: 'Event Albums', albumFilterUnlinked: 'Unlinked',
+    albumHomeEmpty: 'No albums yet — create your first one to save your memories', albumPhotoCount: n => `${n} photo${n === 1 ? '' : 's'}`,
+    linkedEventBadge: e => `⌁ ${e}`, selectPhotosStepTitle: 'Select Photos', selectPhotosHint: 'Choose one or more photos from your device library',
+    selectedPhotosCount: n => `${n} photo${n === 1 ? '' : 's'} selected`, nextStep: 'Next', createAlbumStepTitle: 'Create Album',
+    albumNameLabel: 'Album Name', linkEventLabel: 'Linked Event', noLinkEvent: 'No linked event', linkOptionNew: 'Create a new event',
+    eventPickerTitle: 'Choose Event', moreActions: 'More', back: 'Back', quickEventTitle: 'New Event',
     deleteLandmarkConfirmTitle: 'Delete this landmark?', deleteLandmarkConfirmDesc: title => `Unless you've made a local backup, this cannot be undone. Delete "${title}"?`, confirmDeleteLandmark: 'Confirm Delete', cancelDeleteLandmark: 'Cancel',
     notifyButtonLabel: 'Countdown reminders', notifyPanelTitle: 'Countdown reminder settings',
     notifyEnableLabel: 'Enable notifications', notifyEnableHint: 'Keep this page/app open (a background tab is fine) to receive notifications',
@@ -579,7 +589,6 @@ const STRINGS = {
     modeBirthday: '誕生日', modeCompanion: '寄り添い', modeCare: '追悼', modeAnniversary: '記念日', modeRegular: '通常',
     navSchedule: 'スケジュール', navGallery: 'アルバム', navProfile: 'マイページ', myPageTitle: 'マイページ', addSchedule: '予定を追加',
     darkModeLabel: 'ダークモード', darkModeOn: 'オン', darkModeOff: 'オフ', feedbackLabel: 'フィードバック',
-    galleryEmpty: 'まだ写真がありません。まず記念日イベントの中で写真を追加してください', galleryFrom: e => `${e} より`,
     modeCompanionHint: '絆が始まった日を設定して、二人が共に過ごした時間を確認しましょう。',
     modeAnniversaryHint: '心に刻みたい日を設定すれば、時間軸がここまでの歩みをそっと記録します。',
     modeRegularHint: '飾らず、ただ時間だけを記録します。',
@@ -597,6 +606,12 @@ const STRINGS = {
     noAlbumsYet: 'まだアルバムがありません。作成してみましょう', noPhotosYet: 'このアルバムにはまだ写真がありません。タップして追加',
     addPhoto: '写真を追加', deleteAlbum: 'アルバムを削除', deletePhoto: '写真を削除', confirmRename: '名前の変更を確定', moveTo: '移動先',
     albumPhotoUploadError: '写真のアップロードに失敗しました。別の写真で試してください', renameAlbum: 'アルバム名を変更', syncErrorHint: '直近の保存に失敗しました。データが大きすぎる可能性があります。後でもう一度お試しください',
+    createAlbumBtn: '+ アルバムを作成', albumFilterAll: 'すべて', albumFilterLinked: 'イベント', albumFilterUnlinked: '未リンク',
+    albumHomeEmpty: 'まだアルバムがありません。最初の1冊を作って思い出を残しましょう', albumPhotoCount: n => `${n}枚の写真`,
+    linkedEventBadge: e => `⌁ ${e}`, selectPhotosStepTitle: '写真を選択', selectPhotosHint: 'デバイスのライブラリから写真を1枚以上選んでください',
+    selectedPhotosCount: n => `${n}枚選択済み`, nextStep: '次へ', createAlbumStepTitle: 'アルバムを作成',
+    albumNameLabel: 'アルバム名', linkEventLabel: '関連イベント', noLinkEvent: 'イベントなし', linkOptionNew: '新しいイベントを作成',
+    eventPickerTitle: 'イベントを選択', moreActions: 'その他の操作', back: '戻る', quickEventTitle: '新しいイベント',
     deleteLandmarkConfirmTitle: 'このランドマークを削除しますか？', deleteLandmarkConfirmDesc: title => `ローカルバックアップを取っていない場合、この操作は取り消せません。「${title}」を削除しますか？`, confirmDeleteLandmark: '削除を確認', cancelDeleteLandmark: 'キャンセル',
     notifyButtonLabel: 'カウントダウン通知', notifyPanelTitle: 'カウントダウン通知の設定',
     notifyEnableLabel: '通知を有効にする', notifyEnableHint: '通知を受け取るには、このページ／アプリを開いたままにしてください（バックグラウンドタブでも構いません）',
@@ -673,9 +688,8 @@ const STRINGS = {
     repeatLabel: '반복', every: '매', unitYear: '년', unitMonth: '개월',
     modeSelectLabel: '모드 선택',
     modeBirthday: '생일', modeCompanion: '동반', modeCare: '추모', modeAnniversary: '기념일', modeRegular: '일반',
-    navSchedule: '일정', navGallery: '갤러리', navProfile: '마이페이지', myPageTitle: '마이페이지', addSchedule: '일정 추가',
+    navSchedule: '일정', navGallery: '앨범', navProfile: '마이페이지', myPageTitle: '마이페이지', addSchedule: '일정 추가',
     darkModeLabel: '다크 모드', darkModeOn: '켜짐', darkModeOff: '꺼짐', feedbackLabel: '피드백',
-    galleryEmpty: '아직 사진이 없어요. 먼저 기념일 이벤트 안에서 사진을 추가해 보세요', galleryFrom: e => `출처: ${e}`,
     modeCompanionHint: '인연이 시작된 날을 설정하고 함께한 시간을 확인해 보세요.',
     modeAnniversaryHint: '기억하고 싶은 날을 설정하면 타임라인이 그동안의 발자취를 기록해 줍니다.',
     modeRegularHint: '꾸밈없이 시간만 기록합니다.',
@@ -693,6 +707,12 @@ const STRINGS = {
     noAlbumsYet: '아직 앨범이 없어요. 먼저 하나 만들어 보세요', noPhotosYet: '이 앨범에는 아직 사진이 없어요. 눌러서 추가하세요',
     addPhoto: '사진 추가', deleteAlbum: '앨범 삭제', deletePhoto: '사진 삭제', confirmRename: '이름 변경 확인', moveTo: '이동',
     albumPhotoUploadError: '사진을 업로드하지 못했어요. 다른 사진으로 다시 시도해 주세요', renameAlbum: '앨범 이름 변경', syncErrorHint: '최근 저장에 실패했어요. 데이터가 너무 클 수 있어요. 나중에 다시 시도해 주세요',
+    createAlbumBtn: '+ 앨범 만들기', albumFilterAll: '전체', albumFilterLinked: '이벤트 앨범', albumFilterUnlinked: '미연결',
+    albumHomeEmpty: '아직 앨범이 없어요. 첫 앨범을 만들어 추억을 저장해 보세요', albumPhotoCount: n => `사진 ${n}장`,
+    linkedEventBadge: e => `⌁ ${e}`, selectPhotosStepTitle: '사진 선택', selectPhotosHint: '기기 보관함에서 사진을 한 장 이상 선택하세요',
+    selectedPhotosCount: n => `${n}장 선택됨`, nextStep: '다음', createAlbumStepTitle: '앨범 만들기',
+    albumNameLabel: '앨범 이름', linkEventLabel: '연결된 이벤트', noLinkEvent: '연결된 이벤트 없음', linkOptionNew: '새 이벤트 만들기',
+    eventPickerTitle: '이벤트 선택', moreActions: '더 보기', back: '뒤로', quickEventTitle: '새 이벤트',
     deleteLandmarkConfirmTitle: '이 랜드마크를 삭제할까요?', deleteLandmarkConfirmDesc: title => `로컬 백업을 하지 않았다면 이 작업은 되돌릴 수 없습니다. "${title}"을(를) 삭제하시겠습니까?`, confirmDeleteLandmark: '삭제 확인', cancelDeleteLandmark: '취소',
     notifyButtonLabel: '카운트다운 알림', notifyPanelTitle: '카운트다운 알림 설정',
     notifyEnableLabel: '알림 사용', notifyEnableHint: '알림을 받으려면 이 페이지/앱을 열어 두어야 합니다（백그라운드 탭도 괜찮습니다）',
@@ -3754,7 +3774,7 @@ function PastEventsAnimatedSection({ show, events, renderEventCard }) {
 function TimelineSection({
   events, setEvents, lang, t, now, isDark, customIcons, setCustomIcons,
   onHeaderDragStart, onHeaderDragMove, onHeaderDragEnd,
-  isLargeScreen = false, viewingId, setViewingId,
+  isLargeScreen = false, viewingId, setViewingId, onOpenAlbumForEvent,
   // layout='timeline'（預設）＝「時光線」分頁目前的樣子，完全不動：時間軸線、圓點、
   // 往日地標收合區塊全部保留。layout='cards'＝「日程」分頁用，資料/邏輯完全共用同一份
   // （events／processedEvents／新增編輯刪除相冊等等都沒有另外複製一份），只是渲染時
@@ -3805,31 +3825,9 @@ function TimelineSection({
     }, DELETE_MODAL_DURATION);
   }
   useModalBackClose(!!confirmDeleteId, closeDeleteConfirm);
-  // 「相冊」視窗：存的是目前開啟的那筆事件 id，跟刪除確認同一套模式；相片實際存在事件物件的
-  // albums 欄位（[{id,name,photos:[{id,dataUrl}]}]），透過 setEvents 更新，會自然隨事件一起
-  // 存進本機／雲端備份，不需要另外接一套儲存邏輯。開合動畫沿用「刪除確認」同一套
-  // phase（enter -> shown -> closing）作法：關閉時先播完退場動畫，才真正清空 albumEventId，
-  // 這樣視窗內容（相冊/相片資料）在退場動畫播放期間仍然存在，不會中途消失。
-  const [albumEventId, setAlbumEventId] = useState(null);
-  const [albumModalPhase, setAlbumModalPhase] = useState('hidden');
-  const ALBUM_MODAL_DURATION = 200;
-  function openAlbumModal(id) {
-    setAlbumEventId(id);
-    setAlbumModalPhase('enter');
-    requestAnimationFrame(() => setAlbumModalPhase('shown'));
-  }
-  function closeAlbumModal() {
-    if (!albumEventId || albumModalPhase === 'closing') return;
-    setAlbumModalPhase('closing');
-    setTimeout(() => {
-      setAlbumEventId(null);
-      setAlbumModalPhase('hidden');
-    }, ALBUM_MODAL_DURATION);
-  }
-  useModalBackClose(!!albumEventId, closeAlbumModal);
-  function updateEventAlbums(eventId, updater) {
-    setEvents(prev => prev.map(e => (e.id === eventId ? { ...e, albums: updater(e.albums || []) } : e)));
-  }
+  // 相冊功能已經獨立成一級功能（見 AlbumsFeature／App 內的 albumRoute），這裡的「相冊」按鈕
+  // 只負責呼叫 onOpenAlbumForEvent(id) 交給上層決定要開啟哪個相冊／進入建立流程，
+  // 時間軸本身不再持有任何相冊/相片狀態。
   // 「新增地標」視窗的伸縮動畫改成跟「地標詳情」卡片裡的「自訂」二級面板同一套做法：
   // 不再用 JS（ResizeObserver）即時量測整份表單的實際高度、包一層算出來的像素值做 height
   // transition——量測跟 CSS 動畫是兩條不同步的時間軸，量測結果會在動畫播放途中一路變動、
@@ -4127,7 +4125,6 @@ function TimelineSection({
   // 這裡從 processedEvents 找不到時視為已不存在，順手把確認彈窗收起來即可
   const confirmDeleteEvent = confirmDeleteId ? processedEvents.find(e => e.id === confirmDeleteId) || null : null;
   // 目前開啟「相冊」視窗所對應的事件，同樣從 processedEvents 現查（拿到的是含 albums 欄位的完整事件）
-  const albumEvent = albumEventId ? processedEvents.find(e => e.id === albumEventId) || null : null;
 
   // 已經過去（diffDays < 0）的地標一律歸進上方可收合的區塊，預設收合，
   // 這樣不論未來地標有幾筆（即使只有一筆），開啟頁面時第一眼看到的永遠是它，不必再手動下滑
@@ -4158,7 +4155,7 @@ function TimelineSection({
             <h3 className="font-bold text-lg" style={{ color: INK }}>{ev.title}</h3>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={e => { e.stopPropagation(); openAlbumModal(ev.id); }} aria-label={t.album} title={t.album} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
+            <button onClick={e => { e.stopPropagation(); onOpenAlbumForEvent && onOpenAlbumForEvent(ev.id); }} aria-label={t.album} title={t.album} className="p-2 rounded-lg transition-colors" style={{ color: INK_SOFT }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--card-border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <Images size={15} />
@@ -4922,802 +4919,7 @@ function TimelineSection({
         document.body
       )}
 
-      {/* 「相冊」視窗：點時間軸卡片上的相冊按鈕開啟，跟其他彈窗一樣掛在 document.body 底下、
-          置中顯示、點背景關閉。第一版先不做開合動畫，行為與其餘置中彈窗一致。 */}
-      {albumEvent && createPortal(
-        <AlbumModal
-          ev={albumEvent}
-          t={t}
-          isLargeScreen={isLargeScreen}
-          phase={albumModalPhase}
-          duration={ALBUM_MODAL_DURATION}
-          onClose={closeAlbumModal}
-          onUpdateAlbums={updater => updateEventAlbums(albumEvent.id, updater)}
-        />,
-        document.body
-      )}
     </div>
-  );
-}
-
-/* ---------------- 相冊視窗：可建立多個分相冊，並在各分相冊底下新增／刪除／排序／搬移相片 ----------------
-   相片以縮小過的 JPEG dataURL 存放（沿用 resizeImageFile，跟「自訂背景」上傳同一套壓縮邏輯），
-   避免原始相片檔案太大，把單一事件的資料越存越肥。
-   刪除相冊／相片的規則比照世界時鐘清單：平時不顯示任何刪除按鈕，長按（或按住不放）才會進入
-   「可操作」狀態——相冊是長按直接進入該顆藥丸的重新命名／刪除模式，相片則是長按進入多選模式
-   （比照世界時鐘的 selectMode／已選 N／取消／刪除），避免平常瀏覽時被誤觸。 */
-/* ---------------- 相冊視窗：可建立多個分相冊，並在各分相冊底下新增／刪除／排序／搬移相片 ----------------
-   儲存架構（這點很重要，直接關係到本機／雲端備份是否會悄悄存失敗）：
-   - `ev.albums` 只放「相冊清單的骨架」——每個相冊只有 {id, name}，完全不含相片本體。
-     這份骨架跟著事件一起存在 EVENTS_KEY 這個 window.storage key 裡，也是雲端同步會推送的內容，
-     資料量非常小，不會有儲存體積問題。
-   - 每個相冊實際的相片（縮圖 dataURL）另外存在自己專屬的 window.storage key：
-     `albumPhotos:{albumId}`。window.storage 單一 key 有大小上限，如果相片全部跟事件擠在同一個
-     key 裡，使用者陸續加照片、遲早會整包超過上限，導致「連同其他所有事件資料」一起悄悄存不進去
-     ——這正是先前「相片同步不上雲端、合併後相片消失」問題的根源。拆成每個相冊一把獨立的 key，
-     可以讓單一相冊的容量上限拉高非常多，而且就算某一個相冊真的塞爆了，也只會影響那一個相冊，
-     不會拖累其他事件、其他相冊、甚至整個 App 的資料都存不進去。
-   - 目前雲端同步（Firebase）已經接上 Firebase Storage：相片本體上傳到 Storage
-     （users/{uid}/albums/{albumId}/{photoId}.jpg），Firestore 只存一份輕量的「有哪些相片 id」
-     索引，不再受 Firestore 單一文件 1 MiB 上限影響。本機這邊快取的相片物件可能是 {id, dataUrl}
-     （本機自己拍的／還沒上傳過）或 {id, url}（從雲端下載回來、還沒快取成 dataUrl 的），畫面上
-     顯示相片一律用 `photo.dataUrl || photo.url`，兩種來源都能正常顯示，不需要另外判斷。
-   - 刪除相冊／相片的規則比照世界時鐘清單：平時不顯示任何刪除按鈕，長按（按住不放）才會進入
-     「批量管理」狀態——這時最上面那一列（原本顯示標題／關閉鈕的地方）會整個切換成
-     「已選 N・取消・(重新命名)・刪除」的工具列，管理完再取消或刪除，就會切回原本的標題列。
-     相冊、相片各自有獨立的批量管理狀態，兩者不會同時開啟。 */
-function AlbumModal({ ev, t, isLargeScreen, phase, duration, onClose, onUpdateAlbums }) {
-  const albums = ev.albums || [];
-  const [selectedAlbumId, setSelectedAlbumId] = useState(albums[0]?.id || null);
-  const [showNewAlbumInput, setShowNewAlbumInput] = useState(albums.length === 0);
-  const [newAlbumName, setNewAlbumName] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
-
-  // 「新增相片」提醒視窗：改由原本固定顯示在視窗底部的一行小字（albumBackupReminder），
-  // 改成使用者點「新增相片」時才彈出的視窗，看完並倒數 6 秒後按「我已知悉」才能繼續選檔案；
-  // 按過一次之後（寫進 window.storage 的 ALBUM_ADD_HINT_ACKED_KEY）永久不再彈出。
-  // hintAcked 用 null 代表「還沒讀取到目前狀態」，避免第一次讀取完成前誤判成「還沒看過」而多彈一次。
-  const [hintAcked, setHintAcked] = useState(null);
-  const [showAddHintModal, setShowAddHintModal] = useState(false);
-  const [addHintCountdown, setAddHintCountdown] = useState(6);
-  const ADD_HINT_COUNTDOWN_SECONDS = 6;
-
-  // 這裡故意也掛一個 useModalBackClose，close 函式給空函式（不做任何事）：
-  // 外層的「相冊」視窗本身也是靠 useModalBackClose(!!albumEventId, closeAlbumModal) 監聽 ESC／
-  // 瀏覽器返回鍵，只要它是堆疊最上層，按 ESC 或滑動返回就會把整個相冊視窗關掉——先前提醒視窗只
-  // 拿掉了背景點擊關閉，沒有加入同一套堆疊管理，導致相冊視窗仍是「最上層」，按 ESC／返回鍵還是會
-  // 連同提醒視窗一起被關掉。現在提醒視窗開著時，把自己也推進同一個堆疊、堆疊在相冊視窗之上，
-  // 讓相冊視窗的監聽器判斷「不是最上層」而略過，藉此讓 ESC／返回鍵在提醒視窗開著時完全沒有作用，
-  // 而不是導致外層視窗被誤關。
-  useModalBackClose(showAddHintModal, () => {});
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      let acked = false;
-      try {
-        const res = await window.storage.get(ALBUM_ADD_HINT_ACKED_KEY, false);
-        acked = !!(res && res.value === 'true');
-      } catch (err) {
-        // 還沒存過視為沒看過，屬於正常情況
-      }
-      if (!cancelled) setHintAcked(acked);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // 提醒視窗開著時才跑倒數，每秒遞減一次；關閉視窗或倒數歸零就停止。
-  useEffect(() => {
-    if (!showAddHintModal || addHintCountdown <= 0) return;
-    const timer = setTimeout(() => setAddHintCountdown(s => Math.max(0, s - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [showAddHintModal, addHintCountdown]);
-
-  // 點「新增相片」：還沒按過「我已知悉」就先彈提醒視窗，按過的話直接開檔案選擇窗，跟原本行為一致。
-  function handleAddPhotoClick() {
-    if (hintAcked) {
-      fileInputRef.current && fileInputRef.current.click();
-      return;
-    }
-    setAddHintCountdown(ADD_HINT_COUNTDOWN_SECONDS);
-    setShowAddHintModal(true);
-  }
-  // 「放棄添加」：關掉提醒視窗，不記住已讀狀態、也不開檔案選擇窗——下次點「新增相片」還是會再彈一次。
-  function abandonAddPhoto() {
-    setShowAddHintModal(false);
-  }
-  // 「我已知悉」：倒數結束才可點擊。記住已讀狀態（之後不再彈出），關閉提醒視窗，
-  // 並直接接著開檔案選擇窗，讓使用者不用再點一次「新增相片」。
-  function acknowledgeAddHint() {
-    if (addHintCountdown > 0) return;
-    setHintAcked(true);
-    window.storage.set(ALBUM_ADD_HINT_ACKED_KEY, 'true', false).catch(() => {});
-    setShowAddHintModal(false);
-    fileInputRef.current && fileInputRef.current.click();
-  }
-
-  // 相冊／相片批量刪除前的二次確認：比照「刪除地標」同一套彈窗風格，記錄的是「要不要顯示確認視窗」，
-  // 實際刪除動作要等使用者在確認視窗裡按下「確認刪除」才會真的執行。
-  const [showDeleteAlbumsConfirm, setShowDeleteAlbumsConfirm] = useState(false);
-  const [showDeletePhotosConfirm, setShowDeletePhotosConfirm] = useState(false);
-
-  // 相冊批量管理（長按某個相冊名稱觸發）
-  const [albumSelectMode, setAlbumSelectMode] = useState(false);
-  const [selectedAlbumIds, setSelectedAlbumIds] = useState([]);
-  const [albumRenameDraft, setAlbumRenameDraft] = useState(null); // 非 null 時，最上面那列會變成重新命名輸入框
-
-  // 相片批量管理（長按某張相片觸發），以及跨相冊搬移用的下拉選單
-  const [photoSelectMode, setPhotoSelectMode] = useState(false);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
-  const [showMoveMenu, setShowMoveMenu] = useState(false);
-  // 拖曳排序（同一相冊內）
-  const dragPhotoIdRef = useRef(null);
-  // 相片放大檢視
-  const [lightboxIndex, setLightboxIndex] = useState(null);
-
-  // 相片實際內容：{ [albumId]: Photo[] }，第一次切到某個相冊時才向 window.storage 讀取、讀過就快取著
-  const [photosByAlbum, setPhotosByAlbum] = useState({});
-
-  // 事件的 albums 若在外部變動（例如新增了第一個相冊、目前選取的相冊被刪掉），自動把選取狀態同步過去
-  useEffect(() => {
-    if (selectedAlbumId && albums.some(a => a.id === selectedAlbumId)) return;
-    setSelectedAlbumId(albums[0]?.id || null);
-  }, [albums, selectedAlbumId]);
-
-  // 切到某個相冊、且還沒讀取過它的相片時，向 window.storage 讀一次並快取起來
-  useEffect(() => {
-    if (!selectedAlbumId || photosByAlbum[selectedAlbumId] !== undefined) return;
-    let cancelled = false;
-    (async () => {
-      let photos = [];
-      try {
-        const res = await window.storage.get(ALBUM_PHOTOS_PREFIX + selectedAlbumId, false);
-        if (res && res.value) photos = JSON.parse(res.value);
-      } catch (err) {
-        // 這個相冊還沒有任何相片時，讀一個不存在的 key 本來就會丟錯，屬於正常情況，當作空相冊即可
-      }
-      if (!cancelled) setPhotosByAlbum(prev => (prev[selectedAlbumId] !== undefined ? prev : { ...prev, [selectedAlbumId]: photos }));
-    })();
-    return () => { cancelled = true; };
-  }, [selectedAlbumId, photosByAlbum]);
-
-  // 切換相冊時，重置相片多選／放大檢視等跟「當下這個相冊」綁定的暫存狀態
-  useEffect(() => {
-    setPhotoSelectMode(false);
-    setSelectedPhotoIds([]);
-    setShowMoveMenu(false);
-    setLightboxIndex(null);
-  }, [selectedAlbumId]);
-
-  const selectedAlbum = albums.find(a => a.id === selectedAlbumId) || null;
-  const selectedPhotos = selectedAlbumId ? (photosByAlbum[selectedAlbumId] || []) : [];
-
-  useModalBackClose(lightboxIndex !== null, () => setLightboxIndex(null));
-
-  // 把某個相冊的相片陣列寫回 window.storage；個別相冊各自一把 key，單一相冊爆量也不會拖累其他資料
-  async function persistAlbumPhotos(albumId, photos) {
-    try {
-      await window.storage.set(ALBUM_PHOTOS_PREFIX + albumId, JSON.stringify(photos), false);
-      setError('');
-    } catch (err) {
-      setError(t.albumPhotoUploadError);
-    }
-  }
-  // 更新某相冊相片快取＋同步寫回 storage 的共用小工具
-  function mutateAlbumPhotos(albumId, updater) {
-    setPhotosByAlbum(prev => {
-      const next = updater(prev[albumId] || []);
-      persistAlbumPhotos(albumId, next);
-      return { ...prev, [albumId]: next };
-    });
-  }
-
-  function handleCreateAlbum() {
-    const name = newAlbumName.trim();
-    if (!name) return;
-    const newId = `alb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    onUpdateAlbums(prev => [...prev, { id: newId, name }]);
-    setSelectedAlbumId(newId);
-    setNewAlbumName('');
-    setShowNewAlbumInput(false);
-  }
-
-  // ---- 相冊批量管理 ----
-  function startAlbumSelectMode(id) {
-    cancelPhotoSelect();
-    setAlbumSelectMode(true);
-    setSelectedAlbumIds([id]);
-  }
-  function toggleAlbumSelect(id) {
-    setSelectedAlbumIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
-  }
-  function cancelAlbumSelect() {
-    setAlbumSelectMode(false);
-    setSelectedAlbumIds([]);
-    setAlbumRenameDraft(null);
-  }
-  // 點工具列的刪除鈕：先彈二次確認視窗，不直接刪除
-  function requestDeleteSelectedAlbums() {
-    if (!selectedAlbumIds.length) return;
-    setShowDeleteAlbumsConfirm(true);
-  }
-  // 確認視窗裡按下「確認刪除」才真正執行
-  function performDeleteSelectedAlbums() {
-    const idsToDelete = selectedAlbumIds;
-    setShowDeleteAlbumsConfirm(false);
-    if (!idsToDelete.length) return;
-    onUpdateAlbums(prev => prev.filter(a => !idsToDelete.includes(a.id)));
-    // 相冊骨架刪掉的同時，把對應的相片 storage key 也清掉，不留孤兒資料
-    idsToDelete.forEach(id => { window.storage.delete(ALBUM_PHOTOS_PREFIX + id, false).catch(() => {}); });
-    setPhotosByAlbum(prev => {
-      const next = { ...prev };
-      idsToDelete.forEach(id => { delete next[id]; });
-      return next;
-    });
-    cancelAlbumSelect();
-  }
-  function startRenameSelectedAlbum() {
-    if (selectedAlbumIds.length !== 1) return;
-    const a = albums.find(x => x.id === selectedAlbumIds[0]);
-    setAlbumRenameDraft(a ? a.name : '');
-  }
-  function commitRenameSelectedAlbum() {
-    const name = (albumRenameDraft || '').trim();
-    if (name) onUpdateAlbums(prev => prev.map(a => (a.id === selectedAlbumIds[0] ? { ...a, name } : a)));
-    setAlbumRenameDraft(null);
-    cancelAlbumSelect();
-  }
-  function handleChipTap(id) {
-    if (albumSelectMode) { toggleAlbumSelect(id); return; }
-    setSelectedAlbumId(id);
-    setShowNewAlbumInput(false);
-  }
-
-  async function handleFilesSelected(e) {
-    const files = Array.from(e.target.files || []);
-    e.target.value = '';
-    if (!files.length || !selectedAlbumId) return;
-    setUploading(true);
-    setError('');
-    try {
-      const newPhotos = [];
-      for (const file of files) {
-        try {
-          const dataUrl = await resizeImageFile(file);
-          newPhotos.push({ id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl });
-        } catch (err) {
-          setError(t.albumPhotoUploadError);
-        }
-      }
-      if (newPhotos.length) mutateAlbumPhotos(selectedAlbumId, current => [...current, ...newPhotos]);
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  // ---- 相片批量管理 ----
-  function handlePhotoLongPress(photoId) {
-    cancelAlbumSelect();
-    setPhotoSelectMode(true);
-    setSelectedPhotoIds(prev => (prev.includes(photoId) ? prev : [...prev, photoId]));
-  }
-  function handlePhotoTap(photoId, index) {
-    if (photoSelectMode) {
-      setSelectedPhotoIds(prev => (prev.includes(photoId) ? prev.filter(x => x !== photoId) : [...prev, photoId]));
-      return;
-    }
-    setLightboxIndex(index);
-  }
-  function cancelPhotoSelect() {
-    setPhotoSelectMode(false);
-    setSelectedPhotoIds([]);
-    setShowMoveMenu(false);
-  }
-  // 點工具列的刪除鈕：先彈二次確認視窗，不直接刪除
-  function requestDeleteSelectedPhotos() {
-    if (!selectedAlbumId || !selectedPhotoIds.length) return;
-    setShowDeletePhotosConfirm(true);
-  }
-  // 確認視窗裡按下「確認刪除」才真正執行
-  function performDeleteSelectedPhotos() {
-    setShowDeletePhotosConfirm(false);
-    if (!selectedAlbumId || !selectedPhotoIds.length) return;
-    mutateAlbumPhotos(selectedAlbumId, current => current.filter(p => !selectedPhotoIds.includes(p.id)));
-    cancelPhotoSelect();
-  }
-  // 跨相冊搬移：從目前相冊移除選取的相片，附加進目標相冊尾端；目標相冊若還沒讀取過，先讀出現有內容再附加
-  async function moveSelectedPhotosTo(targetAlbumId) {
-    if (!selectedAlbumId || !selectedPhotoIds.length || targetAlbumId === selectedAlbumId) { setShowMoveMenu(false); return; }
-    const source = photosByAlbum[selectedAlbumId] || [];
-    const moving = source.filter(p => selectedPhotoIds.includes(p.id));
-    if (!moving.length) { setShowMoveMenu(false); return; }
-    mutateAlbumPhotos(selectedAlbumId, current => current.filter(p => !selectedPhotoIds.includes(p.id)));
-
-    let targetCurrent = photosByAlbum[targetAlbumId];
-    if (targetCurrent === undefined) {
-      try {
-        const res = await window.storage.get(ALBUM_PHOTOS_PREFIX + targetAlbumId, false);
-        targetCurrent = res && res.value ? JSON.parse(res.value) : [];
-      } catch (err) { targetCurrent = []; }
-    }
-    mutateAlbumPhotos(targetAlbumId, () => [...targetCurrent, ...moving]);
-    cancelPhotoSelect();
-  }
-
-  // 拖曳排序：拖曳過程中只在記憶體裡即時交換順序（不逐格寫入 storage，避免拖一次觸發一堆寫入），
-  // 放開滑鼠／手指的那一刻才寫回 storage 一次。只在「非多選模式」時允許拖曳，避免跟長按多選互相干擾。
-  function handlePhotoDragStart(photoId) { dragPhotoIdRef.current = photoId; }
-  function handlePhotoDragOver(e, overId) {
-    e.preventDefault();
-    const dragId = dragPhotoIdRef.current;
-    if (!dragId || dragId === overId || !selectedAlbumId) return;
-    setPhotosByAlbum(prev => {
-      const current = prev[selectedAlbumId] || [];
-      const fromIdx = current.findIndex(p => p.id === dragId);
-      const toIdx = current.findIndex(p => p.id === overId);
-      if (fromIdx === -1 || toIdx === -1) return prev;
-      const next = [...current];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      return { ...prev, [selectedAlbumId]: next };
-    });
-  }
-  function handlePhotoDragEnd() {
-    dragPhotoIdRef.current = null;
-    if (selectedAlbumId && photosByAlbum[selectedAlbumId]) persistAlbumPhotos(selectedAlbumId, photosByAlbum[selectedAlbumId]);
-  }
-
-  const shown = phase === 'shown';
-
-  return (
-    <div
-      className="fixed inset-0 flex items-center justify-center px-6"
-      style={{
-        zIndex: 205,
-        background: shown ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)',
-        opacity: phase === 'hidden' ? 0 : 1,
-        transition: `background ${duration}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${duration}ms ease`,
-      }}
-      onClick={onClose}
-    >
-      <div
-        className={`w-full ${isLargeScreen ? 'max-w-md' : 'max-w-sm'} max-h-[85vh] p-5 rounded-2xl flex flex-col gap-4`}
-        style={{
-          ...AUTH_GLASS,
-          opacity: shown ? 1 : 0,
-          transform: shown ? 'translateY(0) scale(1)' : 'translateY(10px) scale(0.97)',
-          transition: `opacity ${duration}ms ease, transform ${duration}ms cubic-bezier(0.34, 1.2, 0.64, 1)`,
-          willChange: 'opacity, transform',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* 最上面這一列會依狀態切換內容：平時顯示標題／關閉鈕；長按相冊名稱後變成
-            「已選 N・取消・(單選時可重新命名)・刪除」；長按相片後變成相片版的同一套工具列。
-            刪除按鈕統一放在這一列，跟世界時鐘「頂列出現已選數量＋刪除」的操作習慣一致。 */}
-        <div className="flex items-center justify-between flex-shrink-0 gap-2 min-h-[30px]">
-          {albumRenameDraft !== null ? (
-            <>
-              <input
-                type="text"
-                autoFocus
-                value={albumRenameDraft}
-                onChange={e => setAlbumRenameDraft(e.target.value)}
-                onFocus={e => e.target.select()}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitRenameSelectedAlbum();
-                  if (e.key === 'Escape') setAlbumRenameDraft(null);
-                }}
-                className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm outline-none"
-                style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
-              />
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={commitRenameSelectedAlbum} aria-label={t.confirmRename} title={t.confirmRename} className="p-1.5 rounded-lg" style={{ color: MINT }}><Check size={16} /></button>
-                <button onClick={() => setAlbumRenameDraft(null)} aria-label={t.cancel} title={t.cancel} className="p-1.5 rounded-lg" style={{ color: INK_SOFT }}><X size={16} /></button>
-              </div>
-            </>
-          ) : albumSelectMode ? (
-            <>
-              <span className="text-sm font-medium truncate" style={{ color: INK_SOFT }}>{t.selectedCount(selectedAlbumIds.length)}</span>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={cancelAlbumSelect} className="text-sm px-2 py-1 rounded-lg" style={{ color: INK_SOFT }}>{t.cancel}</button>
-                {selectedAlbumIds.length === 1 && (
-                  <button onClick={startRenameSelectedAlbum} aria-label={t.renameAlbum} title={t.renameAlbum} className="p-1.5 rounded-lg" style={{ color: INK }}><Pencil size={14} /></button>
-                )}
-                <button
-                  onClick={requestDeleteSelectedAlbums}
-                  disabled={!selectedAlbumIds.length}
-                  className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium flex-shrink-0"
-                  style={{ background: DANGER, color: '#fff', opacity: selectedAlbumIds.length ? 1 : 0.4 }}
-                >
-                  <Trash2 size={13} /> {t.delete}
-                </button>
-              </div>
-            </>
-          ) : photoSelectMode ? (
-            <>
-              <span className="text-sm font-medium truncate" style={{ color: INK_SOFT }}>{t.selectedCount(selectedPhotoIds.length)}</span>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={cancelPhotoSelect} className="text-sm px-2 py-1 rounded-lg" style={{ color: INK_SOFT }}>{t.cancel}</button>
-                {albums.length > 1 && (
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowMoveMenu(v => !v)}
-                      disabled={!selectedPhotoIds.length}
-                      className="flex items-center gap-1 text-sm px-2.5 py-1 rounded-lg font-medium"
-                      style={{ background: 'var(--card-border)', color: INK, opacity: selectedPhotoIds.length ? 1 : 0.4 }}
-                    >
-                      <Move size={13} /> {t.moveTo}
-                    </button>
-                    {showMoveMenu && (
-                      <div className="absolute right-0 mt-1 rounded-xl overflow-hidden z-10" style={{ ...glass(), minWidth: 140, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}>
-                        {albums.filter(a => a.id !== selectedAlbumId).map(a => (
-                          <button key={a.id} onClick={() => moveSelectedPhotosTo(a.id)} className="w-full text-left px-3 py-2 text-sm truncate" style={{ color: INK }}>
-                            {a.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <button
-                  onClick={requestDeleteSelectedPhotos}
-                  disabled={!selectedPhotoIds.length}
-                  className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium flex-shrink-0"
-                  style={{ background: DANGER, color: '#fff', opacity: selectedPhotoIds.length ? 1 : 0.4 }}
-                >
-                  <Trash2 size={13} /> {t.delete}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 min-w-0">
-                <Images size={18} style={{ color: ACCENT, flexShrink: 0 }} />
-                <h2 className="text-lg font-black truncate" style={{ color: INK }}>{t.album} · {ev.title}</h2>
-              </div>
-              <button onClick={onClose} aria-label={t.close} style={{ color: INK_SOFT, flexShrink: 0 }}><X size={18} /></button>
-            </>
-          )}
-        </div>
-
-        {/* 相冊清單：橫向捲動的一排藥丸按鈕，選中要檢視的那個用強調色標示。
-            平時點一下＝切換檢視的相冊；長按某顆藥丸會進入上方頂列的批量管理模式，
-            再點其他藥丸可以繼續加選（多選批量刪除），跟世界時鐘的規則一致。 */}
-        <div className="flex items-center gap-2 overflow-x-auto flex-shrink-0 pb-1">
-          {albums.map(a => (
-            <AlbumChip
-              key={a.id}
-              album={a}
-              viewing={a.id === selectedAlbumId}
-              selectMode={albumSelectMode}
-              checked={selectedAlbumIds.includes(a.id)}
-              onTap={() => handleChipTap(a.id)}
-              onLongPress={() => startAlbumSelectMode(a.id)}
-            />
-          ))}
-          {!albumSelectMode && !photoSelectMode && (
-            <button
-              onClick={() => setShowNewAlbumInput(v => !v)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap flex-shrink-0"
-              style={{ background: 'var(--card-border)', color: INK }}
-            >
-              <Plus size={13} /> {t.newAlbumBtn}
-            </button>
-          )}
-        </div>
-
-        {showNewAlbumInput && !albumSelectMode && !photoSelectMode && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <input
-              type="text"
-              autoFocus
-              value={newAlbumName}
-              onChange={e => setNewAlbumName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleCreateAlbum(); }}
-              placeholder={t.newAlbumPlaceholder}
-              className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
-            />
-            <button
-              onClick={handleCreateAlbum}
-              disabled={!newAlbumName.trim()}
-              className="px-3 py-2 rounded-lg text-sm font-bold flex-shrink-0"
-              style={{ background: newAlbumName.trim() ? MINT : 'var(--card-border)', color: newAlbumName.trim() ? '#fff' : INK_SOFT }}
-            >
-              {t.createAlbum}
-            </button>
-          </div>
-        )}
-
-        {error && <p className="text-xs font-medium flex-shrink-0" style={{ color: DANGER }}>{error}</p>}
-
-        {/* 相片格狀清單：獨立捲動區，避免相片一多整個彈窗被撐高。
-            平時點一下相片＝放大檢視；長按進入多選模式後改成點一下切換勾選；
-            非多選模式時每張相片皆可拖曳，經過另一張時即時交換順序。 */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {!albums.length ? (
-            <p className="text-sm text-center py-6" style={{ color: INK_SOFT }}>{t.noAlbumsYet}</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {!photoSelectMode && !albumSelectMode && selectedAlbumId && (
-                <button
-                  onClick={handleAddPhotoClick}
-                  disabled={uploading}
-                  aria-label={t.addPhoto}
-                  title={t.addPhoto}
-                  className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1"
-                  style={{ border: `1.5px dashed var(--card-border)`, color: INK_SOFT, background: 'transparent' }}
-                >
-                  <Plus size={18} />
-                  <span className="text-[10px] font-bold">{t.newPhotoLabel}</span>
-                </button>
-              )}
-              {selectedPhotos.map((p, idx) => (
-                <PhotoThumb
-                  key={p.id}
-                  photo={p}
-                  selected={selectedPhotoIds.includes(p.id)}
-                  selectMode={photoSelectMode}
-                  draggable={!photoSelectMode}
-                  onTap={() => handlePhotoTap(p.id, idx)}
-                  onLongPress={() => handlePhotoLongPress(p.id)}
-                  onDragStartPhoto={() => handlePhotoDragStart(p.id)}
-                  onDragOverPhoto={e => handlePhotoDragOver(e, p.id)}
-                  onDragEndPhoto={handlePhotoDragEnd}
-                />
-              ))}
-            </div>
-          )}
-          {selectedAlbum && !selectedPhotos.length && (
-            <p className="text-xs text-center mt-3" style={{ color: INK_SOFT }}>{t.noPhotosYet}</p>
-          )}
-        </div>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFilesSelected}
-        />
-      </div>
-
-      {/* 相片放大檢視：疊在相冊視窗之上（點卡片內任一相片、非多選模式時開啟），
-          左右箭頭在同一相冊的相片間切換，點背景或右上角 X 關閉。 */}
-      {lightboxIndex !== null && selectedPhotos[lightboxIndex] && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 260, background: 'rgba(0,0,0,0.85)' }}
-          onClick={() => setLightboxIndex(null)}
-        >
-          <button
-            onClick={e => { e.stopPropagation(); setLightboxIndex(null); }}
-            aria-label={t.close}
-            className="absolute top-4 right-4"
-            style={{ color: '#fff' }}
-          >
-            <X size={26} />
-          </button>
-          {selectedPhotos.length > 1 && (
-            <button
-              onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + selectedPhotos.length) % selectedPhotos.length); }}
-              className="absolute left-2 md:left-6 p-2"
-              style={{ color: '#fff' }}
-            >
-              <ChevronLeft size={30} />
-            </button>
-          )}
-          <img
-            src={selectedPhotos[lightboxIndex].dataUrl || selectedPhotos[lightboxIndex].url}
-            alt=""
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
-            onClick={e => e.stopPropagation()}
-          />
-          {selectedPhotos.length > 1 && (
-            <button
-              onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % selectedPhotos.length); }}
-              className="absolute right-2 md:right-6 p-2"
-              style={{ color: '#fff' }}
-            >
-              <ChevronRight size={30} />
-            </button>
-          )}
-        </div>,
-        document.body
-      )}
-
-      {/* 「新增相片」提醒視窗：點「新增相片」時彈出（見 handleAddPhotoClick），內容包含兩段提醒文字——
-          第一段是原本固定顯示在視窗底部的備份提醒（albumBackupReminder），第二段是原本顯示在「本機
-          備份」區塊裡、提醒備份匯入匯出速度可能變慢的文字（backupSlowdownHint），移進來一併顯示。
-          「我已知悉」按鈕要等 6 秒倒數結束才能點——倒數期間顯示剩餘秒數、按鈕呈現半透明的停用樣式；
-          按下後記住已讀狀態（ALBUM_ADD_HINT_ACKED_KEY），之後點「新增相片」就不會再看到這個視窗，
-          並直接接著開檔案選擇窗。這個視窗刻意做得比較強硬：不支援按 ESC 或點背景關閉，只能按
-          「放棄添加」或等倒數結束按「我已知悉」，兩者都不會記住已讀狀態（只有「我已知悉」會）。
-          ESC／瀏覽器返回鍵在這裡完全不作用：靠上面那個空 close 函式的 useModalBackClose 把自己
-          推進外層「相冊」視窗共用的那個 modal 堆疊、疊在它上面，讓外層相冊視窗自己的 ESC／返回鍵
-          監聽器判斷「輪不到我」而略過，藉此擋掉外層視窗會被連帶關閉的問題。
-          注意最外層這個 div 上的 onClick={e => e.stopPropagation()}：這個視窗是用 createPortal
-          直接掛到 document.body，但它仍然寫在 AlbumModal 這個元件的 JSX 裡面，而 React 的合成事件
-          是照著 React 元件樹（不是實際 DOM 位置）在冒泡的，所以點擊視窗裡任何地方（包含空白背景）
-          若不擋下來，事件還是會一路冒泡到外層相冊視窗自己那個背景 div 的 onClick={onClose}，
-          導致點空白處看似「點到了空氣」，其實整個相冊視窗被關掉了。這裡擋住冒泡、且自己不做任何
-          關閉動作，才能讓點擊這個視窗（不管點哪裡）真的完全沒有效果。
-          視覺風格跟下面兩個批量刪除確認視窗、以及「刪除地標」確認視窗統一：置中彈窗＋毛玻璃卡片。 */}
-      {showAddHintModal && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center px-6"
-          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div
-            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
-            style={{ ...AUTH_GLASS }}
-          >
-            <h2 className="text-lg font-black" style={{ color: INK }}>{t.addPhotoHintTitle}</h2>
-            <p className="text-sm" style={{ color: INK }}>{t.albumBackupReminder}</p>
-            <p className="text-sm" style={{ color: INK }}>{t.backupSlowdownHint}</p>
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={abandonAddPhoto}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid var(--card-border)`, color: INK_SOFT }}
-              >
-                {t.abandonAdd}
-              </button>
-              <button
-                onClick={acknowledgeAddHint}
-                disabled={addHintCountdown > 0}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{
-                  background: ACCENT,
-                  color: '#fff',
-                  opacity: addHintCountdown > 0 ? 0.55 : 1,
-                  cursor: addHintCountdown > 0 ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 180ms ease',
-                }}
-              >
-                {addHintCountdown > 0 ? t.gotItLabelCountdown(addHintCountdown) : t.gotItLabel}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 批量刪除相冊前的二次確認：點工具列的刪除鈕（requestDeleteSelectedAlbums）先彈這個視窗，
-          按「確認刪除」才會真的執行（performDeleteSelectedAlbums），風格跟「刪除地標」確認視窗
-          完全一致（置中彈窗、AUTH_GLASS 毛玻璃卡片、標題 DANGER 紅色、按鈕左白右紅並排）。 */}
-      {showDeleteAlbumsConfirm && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center px-6"
-          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
-          onClick={() => setShowDeleteAlbumsConfirm(false)}
-        >
-          <div
-            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
-            style={{ ...AUTH_GLASS }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteSelectedAlbumsConfirmTitle}</h2>
-              <button onClick={() => setShowDeleteAlbumsConfirm(false)} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
-            </div>
-            <p className="text-sm" style={{ color: INK }}>{t.deleteSelectedAlbumsConfirmDesc(selectedAlbumIds.length)}</p>
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={performDeleteSelectedAlbums}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}
-              >
-                {t.confirmDeleteLandmark}
-              </button>
-              <button
-                onClick={() => setShowDeleteAlbumsConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: DANGER, color: '#fff' }}
-              >
-                {t.cancelDeleteLandmark}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* 批量刪除相片前的二次確認：同上，對象換成目前多選的相片。 */}
-      {showDeletePhotosConfirm && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center px-6"
-          style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }}
-          onClick={() => setShowDeletePhotosConfirm(false)}
-        >
-          <div
-            className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`}
-            style={{ ...AUTH_GLASS }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black" style={{ color: DANGER }}>{t.deleteSelectedPhotosConfirmTitle}</h2>
-              <button onClick={() => setShowDeletePhotosConfirm(false)} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
-            </div>
-            <p className="text-sm" style={{ color: INK }}>{t.deleteSelectedPhotosConfirmDesc(selectedPhotoIds.length)}</p>
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={performDeleteSelectedPhotos}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}
-              >
-                {t.confirmDeleteLandmark}
-              </button>
-              <button
-                onClick={() => setShowDeletePhotosConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: DANGER, color: '#fff' }}
-              >
-                {t.cancelDeleteLandmark}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
-
-// 相冊藥丸按鈕：平時點一下＝切換檢視；長按（比照世界時鐘 ClockRow 的長按判定：按住 500ms 觸發，
-// 移動超過門檻視為捲動、取消觸發）＝進入批量管理模式。批量管理時左上角會冒出打勾框，
-// 跟相片縮圖的多選樣式一致，讓使用者一眼就看得出「現在在選相冊，不是在選相片」。
-function AlbumChip({ album, viewing, selectMode, checked, onTap, onLongPress }) {
-  const timerRef = useRef(null);
-  const firedRef = useRef(false);
-  const startPosRef = useRef({ x: 0, y: 0 });
-  const LONG_PRESS_MOVE_THRESHOLD = 10;
-
-  const start = e => {
-    firedRef.current = false;
-    const point = e.touches ? e.touches[0] : e;
-    startPosRef.current = { x: point.clientX, y: point.clientY };
-    timerRef.current = setTimeout(() => { firedRef.current = true; onLongPress(); }, 500);
-  };
-  const clear = () => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = null; };
-  const move = e => {
-    if (!timerRef.current) return;
-    const point = e.touches ? e.touches[0] : e;
-    const dx = point.clientX - startPosRef.current.x;
-    const dy = point.clientY - startPosRef.current.y;
-    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_THRESHOLD) clear();
-  };
-  const handleClick = () => {
-    if (firedRef.current) { firedRef.current = false; return; }
-    onTap();
-  };
-
-  return (
-    <button
-      onMouseDown={start} onMouseUp={clear} onMouseLeave={clear} onMouseMove={move}
-      onTouchStart={start} onTouchEnd={clear} onTouchMove={move}
-      onClick={handleClick}
-      className="relative px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap flex-shrink-0"
-      style={selectMode
-        ? { background: checked ? 'rgba(255,59,48,0.14)' : 'var(--card-border)', border: `1.5px solid ${checked ? DANGER : 'transparent'}`, color: checked ? DANGER : INK_SOFT }
-        : viewing
-          ? { background: ACCENT, color: '#fff' }
-          : { background: 'var(--card-border)', color: INK_SOFT }}
-    >
-      {selectMode && (
-        <span
-          className="absolute flex items-center justify-center rounded-full"
-          style={{ width: 15, height: 15, top: -3, left: -3, border: `1px solid ${checked ? DANGER : '#fff'}`, background: checked ? DANGER : 'rgba(0,0,0,0.35)' }}
-        >
-          {checked && <Check size={9} color="#fff" />}
-        </span>
-      )}
-      {album.name}
-    </button>
   );
 }
 
@@ -5993,7 +5195,7 @@ function AuthModal({ lang, t, user, onClose, backupData, onImportBackup }) {
   // 用 collectAllAlbumPhotos（跟雲端同步共用同一支函式）；匯入端也已經在共用的 applyCloudData
   // 裡處理過 albumPhotos 欄位了，所以匯入這邊完全不用另外改。
   async function buildBackupPayloadWithPhotos() {
-    const albumPhotos = await collectAllAlbumPhotos(backupData.events);
+    const albumPhotos = await collectAllAlbumPhotos(backupData.albums && backupData.albums.length ? backupData.albums : resolveAlbumsField(backupData));
     return { ...backupData, ...(Object.keys(albumPhotos).length ? { albumPhotos } : {}), exportedAt: Date.now() };
   }
 
@@ -6525,13 +5727,65 @@ const NOTIFY_DAYS_BEFORE_KEY = 'event-notify-days-before';
 // 這樣重複性事件（例如生日）明年倒數又走到同一個天數時，才不會因為存的是同一個數字而被誤判成
 // 「已經通知過」，導致往後每年都收不到提醒
 const NOTIFY_LOG_KEY = 'event-notify-log';
-// 相冊相片本體另外存放的 key 前綴：album-photos:{albumId}，跟事件骨架（EVENTS_KEY）分開存，
-// 詳細原因見 AlbumModal 開頭的註解——避免相片跟其他所有資料擠在同一個 key 裡導致整包存失敗。
+// 相冊相片本體另外存放的 key 前綴：album-photos:{albumId}，跟相冊骨架（ALBUMS_KEY）分開存，
+// 避免相片跟其他所有資料擠在同一個 key 裡導致整包存失敗（單一相冊的相片量爆掉也只影響它自己）。
 const ALBUM_PHOTOS_PREFIX = 'album-photos:';
-// 「新增相片」提醒視窗是否已被使用者按過「我已知悉」——按過之後永久不再彈出（跨相冊、跨事件、
-// 重新整理後都記得），所以獨立存一個 key，交由 AlbumModal 自己讀寫，不用經過 App 上層的
-// events/clocks 那一整套載入流程。
-const ALBUM_ADD_HINT_ACKED_KEY = 'album-add-photo-hint-acked';
+// 相冊功能重新設計後，「相冊」變成獨立一級功能：骨架（{id, name, eventId, createdAt}）存在自己
+// 的 window.storage key，不再寄生在事件的 albums 欄位裡——事件與相冊改成「相冊可選擇性關聯一個
+// 事件」的輕量關係（eventId 可以是 null），而不是「相冊必須屬於某個事件」。
+const ALBUMS_KEY = 'countdown-timeline-albums';
+
+// 產生新相冊 id，跟相片 id 用同一種「時間戳記＋亂數」格式，方便從 id 反推大致建立時間
+// （見 parseAlbumCreatedAt），不用另外多存一個 createdAt 欄位也能有排序依據；
+// 但仍然明確存一份 createdAt，讓「從舊版 ev.albums 搬遷過來的相冊」也能有合理的建立時間可用。
+function makeAlbumId() { return `alb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
+function parseAlbumCreatedAt(id) {
+  const m = /^alb_(\d+)_/.exec(id || '');
+  return m ? parseInt(m[1], 10) : Date.now();
+}
+// 讀取／寫入／刪除某個相冊的相片內容——搬出 AlbumModal 之後變成獨立的頂層函式，
+// 讓相冊首頁（列出所有相冊的封面）、相冊詳細頁都能共用同一套讀寫邏輯。
+async function loadAlbumPhotosGlobal(albumId) {
+  try {
+    const res = await window.storage.get(ALBUM_PHOTOS_PREFIX + albumId, false);
+    return res && res.value ? JSON.parse(res.value) : [];
+  } catch (err) {
+    return [];
+  }
+}
+async function persistAlbumPhotosGlobal(albumId, photos) {
+  await window.storage.set(ALBUM_PHOTOS_PREFIX + albumId, JSON.stringify(photos), false);
+}
+async function deleteAlbumPhotosGlobal(albumId) {
+  try { await window.storage.delete(ALBUM_PHOTOS_PREFIX + albumId, false); } catch (err) { /* 本來就沒有相片，忽略即可 */ }
+}
+
+// 「相冊 ↔ 事件」搬遷：早期版本相冊骨架存在 ev.albums[]（相冊必屬於一個事件），現在改成頂層
+// 獨立清單、每個相冊自己帶一個可為 null 的 eventId。這裡從一份 events 清單反推出等效的頂層
+// 相冊清單，讓舊資料（本機備份檔、雲端舊格式）第一次讀取時能自動接上新結構，不遺失任何相冊。
+function deriveAlbumsFromEvents(eventsList) {
+  const out = [];
+  (eventsList || []).forEach(ev => {
+    (ev.albums || []).forEach(a => {
+      if (a && a.id != null) out.push({ id: a.id, name: a.name || '', eventId: ev.id, createdAt: parseAlbumCreatedAt(a.id) });
+    });
+  });
+  return out;
+}
+// 合併多份相冊清單（依 id 去重），後面的清單覆蓋前面同 id 的內容——用來把「頂層已經存在的相冊
+// 資料」跟「從 events 反推出來的舊格式相冊」合併成一份，不管資料目前是新格式、舊格式，還是新舊
+// 混雜，都能得到一份完整、不重複的相冊清單。
+function mergeAlbumsList(...lists) {
+  const map = new Map();
+  lists.forEach(list => (list || []).forEach(a => { if (a && a.id != null) map.set(a.id, { ...map.get(a.id), ...a }); }));
+  return Array.from(map.values());
+}
+// 從一份可能是雲端或本機的資料物件（{ events, albums }）解析出「這份資料實際代表的相冊清單」：
+// 明確帶著的頂層 albums 欄位（新格式）優先，再用 events 反推出的舊格式相冊補齊，確保新舊資料
+// 混合時不會有任何一邊的相冊憑空消失。
+function resolveAlbumsField(data) {
+  return mergeAlbumsList(deriveAlbumsFromEvents(data && data.events), (data && data.albums) || []);
+}
 
 // 自我修復用的搬遷函式：早期版本可能把相片直接內嵌在 ev.albums[].photos 裡（跟事件骨架擠在同一個
 // window.storage key），一旦累積夠多相片就會整包超過單一 key 的大小上限、悄悄存失敗。這裡偵測到
@@ -6572,10 +5826,12 @@ function photoSigFromAlbumPhotos(albumPhotos) {
   return stableStringify(Object.keys(albumPhotos || {}).sort().map(id => [id, (albumPhotos[id] || []).map(p => p.id)]));
 }
 
-async function collectAllAlbumPhotos(eventsList) {
-  const albumIds = [];
-  (eventsList || []).forEach(e => (e.albums || []).forEach(a => { if (a && a.id != null) albumIds.push(a.id); }));
-  const uniqueIds = Array.from(new Set(albumIds));
+// 收集一份相冊清單（頂層 albums，格式 [{id,...}]）底下所有相冊實際的相片內容（從各自的
+// window.storage key 讀出來），回傳 { [albumId]: Photo[] }，只包含真的有相片的相冊。
+// 相冊改成獨立的頂層清單後，這裡直接吃 albums 陣列本身，不再從 events[].albums 反推 id——
+// 否則沒有關聯任何事件、或關聯的事件跟舊格式無關的相冊，相片會在雲端同步時被漏掉。
+async function collectAllAlbumPhotos(albumsList) {
+  const uniqueIds = Array.from(new Set((albumsList || []).map(a => a && a.id).filter(id => id != null)));
   const result = {};
   await Promise.all(uniqueIds.map(async id => {
     try {
@@ -6837,65 +6093,734 @@ function AnniversaryCalendar({ events, lang, t, now }) {
   );
 }
 
-function GalleryPage({ events, t }) {
-  const [viewingPhoto, setViewingPhoto] = useState(null); // { dataUrl, eventTitle, albumName } | null
+/* ==================================================================================
+   相冊（獨立一級功能）
+   ----------------------------------------------------------------------------------
+   資料關係：事件 ↔ 相冊 ↔ 照片。相冊是核心（{id, name, eventId|null, createdAt}），
+   是否關聯事件是可選項——一個事件可以有多個相冊，一個相冊最多關聯一個事件，未關聯任何
+   事件的相冊一樣正常可用。相冊本身、相片本身都不重新製作時間軸的視覺結構（軸線、圓點、
+   事件卡片），首頁以「照片」為視覺核心（封面網格），詳細頁是沉浸式照片牆。
 
-  const allPhotos = events.flatMap(ev =>
-    (ev.albums || []).flatMap(al =>
-      (al.photos || []).map(p => ({
-        id: `${ev.id}-${al.id}-${p.id}`,
-        dataUrl: p.dataUrl,
-        eventTitle: ev.title,
-        albumName: al.name,
-      }))
-    )
-  );
+   AlbumsFeature 是整個功能的路由外殼：screen 分 home／create／detail 三種，route 狀態
+   由上層 App 持有（見 App() 內的 albumRoute／setAlbumRoute），這樣時間軸卡片上的「相冊」
+   按鈕才能直接指定要打開哪個畫面（例如某個事件已經有相冊時，直接跳進相冊詳細頁），而不是
+   每次都要先回到相冊首頁再手動點進去。
+   ================================================================================== */
+
+function AlbumsFeature({ events, setEvents, albums, setAlbums, route, setRoute, lang, t, isLargeScreen, onViewEvent }) {
+  function goHome() { setRoute({ screen: 'home', detailAlbumId: null, prefillEventId: null }); }
+  function goCreate(prefillEventId) { setRoute({ screen: 'create', detailAlbumId: null, prefillEventId: prefillEventId || null }); }
+  function goDetail(albumId) { setRoute({ screen: 'detail', detailAlbumId: albumId, prefillEventId: null }); }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-      {allPhotos.length === 0 ? (
-        <p className="text-sm text-center py-10" style={{ color: INK_SOFT }}>{t.galleryEmpty}</p>
+    <div className="flex-1 min-h-0 flex flex-col">
+      {route.screen === 'home' && (
+        <AlbumsHomeScreen
+          events={events}
+          albums={albums}
+          t={t}
+          onOpenAlbum={goDetail}
+          onCreate={() => goCreate(null)}
+        />
+      )}
+      {route.screen === 'create' && (
+        <CreateAlbumFlow
+          events={events}
+          setEvents={setEvents}
+          setAlbums={setAlbums}
+          t={t}
+          prefillEventId={route.prefillEventId}
+          onCancel={goHome}
+          onDone={albumId => goDetail(albumId)}
+        />
+      )}
+      {route.screen === 'detail' && (
+        <AlbumDetailScreen
+          album={albums.find(a => a.id === route.detailAlbumId) || null}
+          events={events}
+          setEvents={setEvents}
+          setAlbums={setAlbums}
+          t={t}
+          isLargeScreen={isLargeScreen}
+          onBack={goHome}
+          onViewEvent={onViewEvent}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------------- 相冊首頁：照片封面網格，不顯示時間軸、不重新製作事件列表 ---------------- */
+function AlbumsHomeScreen({ events, albums, t, onOpenAlbum, onCreate }) {
+  // 「全部／事件相冊／未關聯」篩選——未關聯不是錯誤狀態，只是普通的第三種篩選條件。
+  const [filter, setFilter] = useState('all');
+  const [photoInfo, setPhotoInfo] = useState({}); // { [albumId]: { count, covers: [dataUrl,...] } }
+
+  // 相冊清單一有變動（新增／刪除／改名不影響這裡，但保守起見一起重新讀取），重新讀一次
+  // 每個相冊的相片數量跟前三張封面用的縮圖；相片本體仍然各自存在自己的 storage key。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const next = {};
+      for (const a of albums) {
+        const photos = await loadAlbumPhotosGlobal(a.id);
+        next[a.id] = { count: photos.length, covers: photos.slice(0, 3).map(p => p.dataUrl) };
+      }
+      if (!cancelled) setPhotoInfo(next);
+    })();
+    return () => { cancelled = true; };
+  }, [albums]);
+
+  const eventsById = {};
+  events.forEach(ev => { eventsById[ev.id] = ev; });
+
+  const visible = albums
+    .filter(a => (filter === 'all' ? true : filter === 'linked' ? !!a.eventId : !a.eventId))
+    .slice()
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto pb-4 flex flex-col gap-3">
+      <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto">
+        <button
+          onClick={onCreate}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold whitespace-nowrap flex-shrink-0"
+          style={{ background: ACCENT, color: '#fff' }}
+        >
+          <Plus size={14} /> {t.createAlbumBtn}
+        </button>
+        {[['all', t.albumFilterAll], ['linked', t.albumFilterLinked], ['unlinked', t.albumFilterUnlinked]].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setFilter(id)}
+            className="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap flex-shrink-0"
+            style={filter === id ? { background: 'var(--card-border)', color: INK } : { background: 'transparent', color: INK_SOFT }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="text-sm text-center py-10" style={{ color: INK_SOFT }}>{t.albumHomeEmpty}</p>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {allPhotos.map(photo => (
-            <button
-              key={photo.id}
-              onClick={() => setViewingPhoto(photo)}
-              className="aspect-square rounded-xl overflow-hidden"
-              style={{ border: CARD_BORDER }}
-            >
-              <img src={photo.dataUrl} alt="" className="w-full h-full object-cover" />
-            </button>
+        <div className="grid grid-cols-2 gap-3">
+          {visible.map(a => (
+            <AlbumCoverCard
+              key={a.id}
+              album={a}
+              linkedEvent={a.eventId ? eventsById[a.eventId] : null}
+              photoCount={(photoInfo[a.id] && photoInfo[a.id].count) || 0}
+              coverPhotos={(photoInfo[a.id] && photoInfo[a.id].covers) || []}
+              onOpen={() => onOpenAlbum(a.id)}
+              t={t}
+            />
           ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* 單張放大預覽：顯示相片來自哪個紀念日／哪個相冊，方便追溯，但不提供編輯／刪除——
-          相片的新增、移動、刪除一律回到原本的紀念日相冊裡操作，圖片庫只負責瀏覽。 */}
-      {viewingPhoto && (
-        <div
-          className="fixed inset-0 flex flex-col items-center justify-center px-6"
-          style={{ zIndex: 200, background: 'rgba(0,0,0,0.85)' }}
-          onClick={() => setViewingPhoto(null)}
-        >
-          <button
-            onClick={() => setViewingPhoto(null)}
-            className="absolute flex items-center justify-center rounded-full"
-            style={{ top: 'calc(env(safe-area-inset-top, 0px) + 16px)', right: 16, width: 36, height: 36, background: 'rgba(255,255,255,0.15)', color: '#fff' }}
-          >
-            <X size={18} />
-          </button>
-          <img
-            src={viewingPhoto.dataUrl}
-            alt=""
-            onClick={e => e.stopPropagation()}
-            className="max-w-[88vw] max-h-[70vh] rounded-lg object-contain"
-          />
-          <div className="mt-4 text-center" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-bold" style={{ color: '#fff' }}>{viewingPhoto.eventTitle}</p>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.65)' }}>{t.galleryFrom(viewingPhoto.albumName)}</p>
-          </div>
+// 相冊封面卡：照片是主體，用 2-3 張相片做出輕微的堆疊效果，讓人一眼看出這是一個照片集合，
+// 而不是一張普通的資料卡片。相冊名稱／照片數量用簡潔文字覆蓋在照片下緣，如果有關聯事件，
+// 用一個非常輕量的「⌁ 事件名稱」文字標示，不顯示完整事件卡片、倒數資訊或事件模式。
+function AlbumCoverCard({ album, linkedEvent, photoCount, coverPhotos, onOpen, t }) {
+  return (
+    <button
+      onClick={onOpen}
+      className="relative rounded-2xl overflow-hidden text-left"
+      style={{ aspectRatio: '1 / 1', background: 'var(--card-border)' }}
+    >
+      {coverPhotos[0] ? (
+        <>
+          {coverPhotos[2] && (
+            <div
+              className="absolute inset-0"
+              style={{ backgroundImage: `url(${coverPhotos[2]})`, backgroundSize: 'cover', backgroundPosition: 'center', transform: 'rotate(4deg) scale(0.92)', opacity: 0.55 }}
+            />
+          )}
+          {coverPhotos[1] && (
+            <div
+              className="absolute inset-0"
+              style={{ backgroundImage: `url(${coverPhotos[1]})`, backgroundSize: 'cover', backgroundPosition: 'center', transform: 'rotate(-3deg) scale(0.96)', opacity: 0.75 }}
+            />
+          )}
+          <img src={coverPhotos[0]} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        </>
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ color: INK_SOFT }}>
+          <Images size={26} />
         </div>
+      )}
+      <div
+        className="absolute inset-x-0 bottom-0 px-3 py-2.5"
+        style={{ background: 'linear-gradient(to top, rgba(20,20,26,0.62), rgba(20,20,26,0))' }}
+      >
+        <p className="text-sm font-bold truncate" style={{ color: '#fff' }}>{album.name}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[11px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.85)' }}>{t.albumPhotoCount(photoCount)}</span>
+          {linkedEvent && (
+            <span className="text-[11px] truncate" style={{ color: 'rgba(255,255,255,0.85)' }}>{t.linkedEventBadge(linkedEvent.title)}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ---------------- 建立相冊：照片優先的兩步驟流程 ---------------- */
+// 第一步「選擇照片」：跟相片本身直接綁定，不要求先想好相冊名稱或事件；
+// 第二步才是「建立相冊」：填名稱、決定要不要關聯事件，預設「不關聯事件」。
+function CreateAlbumFlow({ events, setEvents, setAlbums, t, prefillEventId, onCancel, onDone }) {
+  const [step, setStep] = useState(1);
+  const [photos, setPhotos] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [eventId, setEventId] = useState(prefillEventId || null);
+  const [showEventPicker, setShowEventPicker] = useState(false);
+  const [showQuickEvent, setShowQuickEvent] = useState(false);
+  const fileInputRef = useRef(null);
+
+  async function handleFilesSelected(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length) return;
+    setUploading(true);
+    setError('');
+    try {
+      const newPhotos = [];
+      for (const file of files) {
+        try {
+          const dataUrl = await resizeImageFile(file);
+          newPhotos.push({ id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl });
+        } catch (err) {
+          setError(t.albumPhotoUploadError);
+        }
+      }
+      if (newPhotos.length) setPhotos(prev => [...prev, ...newPhotos]);
+    } finally {
+      setUploading(false);
+    }
+  }
+  function removePhoto(id) { setPhotos(prev => prev.filter(p => p.id !== id)); }
+
+  async function finishCreate() {
+    const finalName = name.trim() || t.newAlbumPlaceholder;
+    const id = makeAlbumId();
+    try { await persistAlbumPhotosGlobal(id, photos); } catch (err) { /* 骨架仍然建立，相片留給使用者之後在詳細頁重試新增 */ }
+    setAlbums(prev => [...prev, { id, name: finalName, eventId: eventId || null, createdAt: Date.now() }]);
+    onDone(id);
+  }
+
+  const linkedEventTitle = eventId ? (events.find(e => e.id === eventId) || {}).title : '';
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button onClick={() => (step === 1 ? onCancel() : setStep(1))} aria-label={t.back} style={{ color: INK }}>
+          <ChevronLeft size={20} />
+        </button>
+        <h2 className="text-base font-black flex-1 truncate" style={{ color: INK }}>
+          {step === 1 ? t.selectPhotosStepTitle : t.createAlbumStepTitle}
+        </h2>
+      </div>
+
+      {step === 1 ? (
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
+          <p className="text-xs flex-shrink-0" style={{ color: INK_SOFT }}>
+            {photos.length ? t.selectedPhotosCount(photos.length) : t.selectPhotosHint}
+          </p>
+          {error && <p className="text-xs flex-shrink-0" style={{ color: DANGER }}>{error}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              disabled={uploading}
+              aria-label={t.addPhoto}
+              className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1"
+              style={{ border: '1.5px dashed var(--card-border)', color: INK_SOFT, background: 'transparent' }}
+            >
+              <Plus size={18} />
+              <span className="text-[10px] font-bold">{t.newPhotoLabel}</span>
+            </button>
+            {photos.map(p => (
+              <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden">
+                <img src={p.dataUrl} alt="" className="w-full h-full object-cover" />
+                <button
+                  onClick={() => removePhoto(p.id)}
+                  className="absolute flex items-center justify-center rounded-full"
+                  style={{ top: 4, right: 4, width: 20, height: 20, background: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFilesSelected} />
+          <div className="flex-1" />
+          <button
+            onClick={() => photos.length && setStep(2)}
+            disabled={!photos.length}
+            className="w-full py-3 rounded-xl font-bold text-sm flex-shrink-0"
+            style={{ background: photos.length ? ACCENT : 'var(--card-border)', color: photos.length ? '#fff' : INK_SOFT }}
+          >
+            {t.nextStep}
+          </button>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <label className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.albumNameLabel}</label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder={t.newAlbumPlaceholder}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none"
+              style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <label className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.linkEventLabel}</label>
+            <button
+              onClick={() => setShowEventPicker(true)}
+              className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm"
+              style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+            >
+              <span className="truncate">{eventId ? linkedEventTitle : t.noLinkEvent}</span>
+              <ChevronRight size={16} style={{ color: INK_SOFT, flexShrink: 0 }} />
+            </button>
+          </div>
+
+          <div className="flex-1" />
+          <button onClick={finishCreate} className="w-full py-3 rounded-xl font-bold text-sm flex-shrink-0" style={{ background: ACCENT, color: '#fff' }}>
+            {t.createAlbum}
+          </button>
+        </div>
+      )}
+
+      {showEventPicker && (
+        <EventLinkPicker
+          events={events}
+          currentEventId={eventId}
+          t={t}
+          onClose={() => setShowEventPicker(false)}
+          onSelectNone={() => { setEventId(null); setShowEventPicker(false); }}
+          onSelectEvent={id => { setEventId(id); setShowEventPicker(false); }}
+          onCreateNew={() => { setShowEventPicker(false); setShowQuickEvent(true); }}
+        />
+      )}
+      {showQuickEvent && (
+        <QuickCreateEventSheet
+          t={t}
+          setEvents={setEvents}
+          onCancel={() => setShowQuickEvent(false)}
+          onCreated={id => { setEventId(id); setShowQuickEvent(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// 「關聯事件」選擇面板：不關聯事件／選擇事件（列出現有事件）／從這裡建立新事件——
+// 輕量設定，不是相冊的核心結構，選完直接回到上一層，只顯示選中的事件名稱即可。
+function EventLinkPicker({ events, currentEventId, t, onClose, onSelectNone, onSelectEvent, onCreateNew }) {
+  useModalBackClose(true, onClose);
+  const sorted = events.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-end md:items-center md:justify-center"
+      style={{ zIndex: 260, background: 'rgba(0,0,0,0.4)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full md:max-w-sm max-h-[75vh] rounded-t-3xl md:rounded-2xl p-5 flex flex-col gap-3"
+        style={{ ...AUTH_GLASS }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between flex-shrink-0">
+          <h2 className="text-base font-black" style={{ color: INK }}>{t.linkEventLabel}</h2>
+          <button onClick={onClose} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1">
+          <button
+            onClick={onSelectNone}
+            className="text-left px-3 py-3 rounded-xl text-sm font-bold"
+            style={{ background: !currentEventId ? 'var(--card-border)' : 'transparent', color: INK }}
+          >
+            {t.noLinkEvent}
+          </button>
+          <button onClick={onCreateNew} className="text-left px-3 py-3 rounded-xl text-sm font-bold flex items-center gap-1.5" style={{ color: ACCENT }}>
+            <Plus size={14} /> {t.linkOptionNew}
+          </button>
+          {sorted.length > 0 && <p className="text-[11px] font-bold px-3 pt-1" style={{ color: INK_SOFT }}>{t.eventPickerTitle}</p>}
+          {sorted.map(ev => (
+            <button
+              key={ev.id}
+              onClick={() => onSelectEvent(ev.id)}
+              className="text-left px-3 py-2.5 rounded-xl text-sm flex items-center justify-between gap-2"
+              style={{ background: currentEventId === ev.id ? 'var(--card-border)' : 'transparent', color: INK }}
+            >
+              <span className="flex items-center gap-2 min-w-0"><span className="flex-shrink-0">{ev.icon}</span><span className="truncate">{ev.title}</span></span>
+              <span className="text-xs flex-shrink-0" style={{ color: INK_SOFT }}>{(ev.date || '').replace(/-/g, '.')}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// 「從這裡建立新事件」的輕量快速建立表單：只問標題跟日期，其餘（圖示、顏色、模式、重複規則等）
+// 用預設值，事件建立好之後仍然可以回到「日程」／「時光線」分頁用完整的編輯表單調整。
+function QuickCreateEventSheet({ t, setEvents, onCancel, onCreated }) {
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState('');
+  useModalBackClose(true, onCancel);
+
+  function submit() {
+    if (!title.trim() || !date) return;
+    const id = Date.now().toString();
+    setEvents(prev => [...prev, {
+      id, title: title.trim(), date, time: '', icon: ICONS[0], colorId: COLOR_TAGS[0].id,
+      calendar: 'gregory', repeat: false, repeatUnit: 'year', repeatInterval: 1,
+      isBirthday: false, isCare: false, careCustomIcon: null, mode: 'regular',
+    }]);
+    onCreated(id);
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 flex items-end md:items-center md:justify-center px-0 md:px-6" style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }} onClick={onCancel}>
+      <div
+        className="w-full md:max-w-sm rounded-t-3xl md:rounded-2xl p-5 flex flex-col gap-3"
+        style={{ ...AUTH_GLASS }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-black" style={{ color: INK }}>{t.quickEventTitle}</h2>
+          <button onClick={onCancel} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.titleLabel}</label>
+          <input
+            autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder={t.titlePlaceholder}
+            className="px-3 py-2.5 rounded-xl text-sm outline-none" style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-bold" style={{ color: INK_SOFT }}>{t.dateLabel}</label>
+          <input
+            type="date" value={date} onChange={e => setDate(e.target.value)}
+            className="px-3 py-2.5 rounded-xl text-sm outline-none" style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+          />
+        </div>
+        <button
+          onClick={submit}
+          disabled={!title.trim() || !date}
+          className="w-full py-2.5 rounded-xl font-bold text-sm mt-1"
+          style={{ background: title.trim() && date ? ACCENT : 'var(--card-border)', color: title.trim() && date ? '#fff' : INK_SOFT }}
+        >
+          {t.createAlbum}
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// 二次確認彈窗（刪除相片／刪除相冊共用同一個視覺樣式，跟「刪除地標」確認視窗一致）。
+function ConfirmSheet({ isLargeScreen, title, desc, t, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center px-6" style={{ zIndex: 270, background: 'rgba(0,0,0,0.4)' }} onClick={onCancel}>
+      <div className={`w-full ${isLargeScreen ? 'max-w-sm' : 'max-w-xs'} p-6 rounded-2xl flex flex-col gap-3`} style={{ ...AUTH_GLASS }} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-black" style={{ color: DANGER }}>{title}</h2>
+          <button onClick={onCancel} aria-label={t.close} style={{ color: INK_SOFT }}><X size={18} /></button>
+        </div>
+        <p className="text-sm" style={{ color: INK }}>{desc}</p>
+        <div className="flex items-center gap-2.5">
+          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl font-bold text-sm" style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${DANGER}`, color: DANGER }}>
+            {t.confirmDeleteLandmark}
+          </button>
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl font-bold text-sm" style={{ background: DANGER, color: '#fff' }}>
+            {t.cancelDeleteLandmark}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- 相冊詳細頁：沉浸式照片瀏覽，頂部只留返回／相冊名稱／更多操作 ---------------- */
+function AlbumDetailScreen({ album, events, setEvents, setAlbums, t, isLargeScreen, onBack, onViewEvent }) {
+  const [photos, setPhotos] = useState(null); // null = 尚未讀取完成
+  const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [photoSelectMode, setPhotoSelectMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showDeletePhotosConfirm, setShowDeletePhotosConfirm] = useState(false);
+  const [showDeleteAlbumConfirm, setShowDeleteAlbumConfirm] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [showEventPicker, setShowEventPicker] = useState(false);
+  const [showQuickEvent, setShowQuickEvent] = useState(false);
+  const dragPhotoIdRef = useRef(null);
+  const albumId = album && album.id;
+
+  useEffect(() => {
+    let cancelled = false;
+    setPhotos(null);
+    if (!albumId) return;
+    (async () => {
+      const list = await loadAlbumPhotosGlobal(albumId);
+      if (!cancelled) setPhotos(list);
+    })();
+    return () => { cancelled = true; };
+  }, [albumId]);
+
+  useModalBackClose(lightboxIndex !== null, () => setLightboxIndex(null));
+
+  async function persist(next) {
+    setPhotos(next);
+    if (!albumId) return;
+    try { await persistAlbumPhotosGlobal(albumId, next); setError(''); }
+    catch (err) { setError(t.albumPhotoUploadError); }
+  }
+
+  function handleAddPhotoClick() { fileInputRef.current && fileInputRef.current.click(); }
+  async function handleFilesSelected(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length || !albumId) return;
+    setUploading(true);
+    setError('');
+    try {
+      const newPhotos = [];
+      for (const file of files) {
+        try {
+          const dataUrl = await resizeImageFile(file);
+          newPhotos.push({ id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, dataUrl });
+        } catch (err) {
+          setError(t.albumPhotoUploadError);
+        }
+      }
+      if (newPhotos.length) persist([...(photos || []), ...newPhotos]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handlePhotoLongPress(id) { setPhotoSelectMode(true); setSelectedPhotoIds(prev => (prev.includes(id) ? prev : [...prev, id])); }
+  function handlePhotoTap(id, idx) {
+    if (photoSelectMode) { setSelectedPhotoIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])); return; }
+    setLightboxIndex(idx);
+  }
+  function cancelPhotoSelect() { setPhotoSelectMode(false); setSelectedPhotoIds([]); }
+  function performDeleteSelectedPhotos() {
+    setShowDeletePhotosConfirm(false);
+    persist((photos || []).filter(p => !selectedPhotoIds.includes(p.id)));
+    cancelPhotoSelect();
+  }
+  function handlePhotoDragStart(id) { dragPhotoIdRef.current = id; }
+  function handlePhotoDragOver(e, overId) {
+    e.preventDefault();
+    const dragId = dragPhotoIdRef.current;
+    if (!dragId || dragId === overId) return;
+    setPhotos(current => {
+      const list = current || [];
+      const fromIdx = list.findIndex(p => p.id === dragId);
+      const toIdx = list.findIndex(p => p.id === overId);
+      if (fromIdx === -1 || toIdx === -1) return current;
+      const next = [...list];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+  }
+  function handlePhotoDragEnd() { dragPhotoIdRef.current = null; if (albumId && photos) persistAlbumPhotosGlobal(albumId, photos).catch(() => {}); }
+
+  function startRename() { setRenameDraft(album.name); setRenaming(true); setShowMoreMenu(false); }
+  function commitRename() {
+    const name = renameDraft.trim();
+    if (name) setAlbums(prev => prev.map(a => (a.id === albumId ? { ...a, name } : a)));
+    setRenaming(false);
+  }
+  function requestDeleteAlbum() { setShowMoreMenu(false); setShowDeleteAlbumConfirm(true); }
+  function performDeleteAlbum() {
+    setShowDeleteAlbumConfirm(false);
+    setAlbums(prev => prev.filter(a => a.id !== albumId));
+    deleteAlbumPhotosGlobal(albumId);
+    // 保險：如果這個相冊是從舊版「事件內嵌 albums」搬遷過來的，事件物件裡可能還留著同一個 id
+    // 的骨架殘影（搬遷過程刻意保留、沒有清除，見 resolveAlbumsField 的說明）。這裡刪除相冊時
+    // 順手把各事件 albums 欄位裡同 id 的殘影一併清掉，避免下次重新整理／雲端同步時，
+    // deriveAlbumsFromEvents 又把已經刪除的相冊「復活」回來。
+    setEvents(prev => prev.map(e => (
+      Array.isArray(e.albums) && e.albums.some(a => a && a.id === albumId)
+        ? { ...e, albums: e.albums.filter(a => !a || a.id !== albumId) }
+        : e
+    )));
+    onBack();
+  }
+  function applyLinkEvent(nextEventId) {
+    setAlbums(prev => prev.map(a => (a.id === albumId ? { ...a, eventId: nextEventId } : a)));
+    setShowEventPicker(false);
+  }
+
+  if (!album) return null;
+  const linkedEvent = album.eventId ? events.find(e => e.id === album.eventId) : null;
+  const list = photos || [];
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
+      <div className="flex items-center justify-between flex-shrink-0 gap-2 min-h-[32px]">
+        {renaming ? (
+          <>
+            <input
+              autoFocus value={renameDraft} onChange={e => setRenameDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(false); }}
+              className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm outline-none" style={{ border: CARD_BORDER, background: INPUT_BG, color: INK }}
+            />
+            <button onClick={commitRename} aria-label={t.confirmRename} style={{ color: MINT }}><Check size={18} /></button>
+            <button onClick={() => setRenaming(false)} aria-label={t.cancel} style={{ color: INK_SOFT }}><X size={18} /></button>
+          </>
+        ) : photoSelectMode ? (
+          <>
+            <span className="text-sm font-medium truncate" style={{ color: INK_SOFT }}>{t.selectedCount(selectedPhotoIds.length)}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={cancelPhotoSelect} className="text-sm px-2 py-1 rounded-lg" style={{ color: INK_SOFT }}>{t.cancel}</button>
+              <button
+                onClick={() => setShowDeletePhotosConfirm(true)}
+                disabled={!selectedPhotoIds.length}
+                className="flex items-center gap-1 text-sm px-3 py-1 rounded-lg font-medium"
+                style={{ background: DANGER, color: '#fff', opacity: selectedPhotoIds.length ? 1 : 0.4 }}
+              >
+                <Trash2 size={13} /> {t.delete}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <button onClick={onBack} aria-label={t.back} style={{ color: INK, flexShrink: 0 }}><ChevronLeft size={22} /></button>
+            <div className="flex-1 min-w-0 flex flex-col items-center">
+              <h2 className="text-sm font-black truncate max-w-full" style={{ color: INK }}>{album.name}</h2>
+              {linkedEvent && (
+                <button onClick={() => onViewEvent && onViewEvent(linkedEvent.id)} className="text-[11px] truncate max-w-full" style={{ color: ACCENT }}>
+                  {t.linkedEventBadge(linkedEvent.title)}
+                </button>
+              )}
+            </div>
+            <div className="relative flex-shrink-0">
+              <button onClick={() => setShowMoreMenu(v => !v)} aria-label={t.moreActions} title={t.moreActions} style={{ color: INK }}><Settings size={18} /></button>
+              {showMoreMenu && (
+                <div className="absolute right-0 mt-1 rounded-xl overflow-hidden z-10" style={{ ...glass(), minWidth: 168, boxShadow: '0 10px 30px rgba(35,39,51,0.15)' }}>
+                  <button onClick={startRename} className="w-full text-left px-3 py-2.5 text-sm" style={{ color: INK }}>{t.renameAlbum}</button>
+                  <button onClick={() => { setShowMoreMenu(false); setShowEventPicker(true); }} className="w-full text-left px-3 py-2.5 text-sm" style={{ color: INK }}>{t.linkEventLabel}</button>
+                  <button onClick={requestDeleteAlbum} className="w-full text-left px-3 py-2.5 text-sm" style={{ color: DANGER }}>{t.deleteAlbum}</button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between flex-shrink-0">
+        <p className="text-xs" style={{ color: INK_SOFT }}>{t.albumPhotoCount(list.length)}</p>
+      </div>
+      {error && <p className="text-xs flex-shrink-0" style={{ color: DANGER }}>{error}</p>}
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="grid grid-cols-3 gap-1.5">
+          {!photoSelectMode && (
+            <button
+              onClick={handleAddPhotoClick}
+              disabled={uploading}
+              aria-label={t.addPhoto}
+              title={t.addPhoto}
+              className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1"
+              style={{ border: '1.5px dashed var(--card-border)', color: INK_SOFT, background: 'transparent' }}
+            >
+              <Plus size={18} />
+              <span className="text-[10px] font-bold">{t.newPhotoLabel}</span>
+            </button>
+          )}
+          {list.map((p, idx) => (
+            <PhotoThumb
+              key={p.id}
+              photo={p}
+              selected={selectedPhotoIds.includes(p.id)}
+              selectMode={photoSelectMode}
+              draggable={!photoSelectMode}
+              onTap={() => handlePhotoTap(p.id, idx)}
+              onLongPress={() => handlePhotoLongPress(p.id)}
+              onDragStartPhoto={() => handlePhotoDragStart(p.id)}
+              onDragOverPhoto={e => handlePhotoDragOver(e, p.id)}
+              onDragEndPhoto={handlePhotoDragEnd}
+            />
+          ))}
+        </div>
+        {photos !== null && !list.length && <p className="text-xs text-center mt-4" style={{ color: INK_SOFT }}>{t.noPhotosYet}</p>}
+        {list.length > 0 && <p className="text-[11px] text-center mt-4 opacity-70" style={{ color: INK_SOFT }}>{t.albumBackupReminder}</p>}
+      </div>
+
+      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFilesSelected} />
+
+      {lightboxIndex !== null && list[lightboxIndex] && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 260, background: 'rgba(0,0,0,0.85)' }} onClick={() => setLightboxIndex(null)}>
+          <button onClick={e => { e.stopPropagation(); setLightboxIndex(null); }} aria-label={t.close} className="absolute top-4 right-4" style={{ color: '#fff' }}><X size={26} /></button>
+          {list.length > 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i - 1 + list.length) % list.length); }} className="absolute left-2 md:left-6 p-2" style={{ color: '#fff' }}>
+              <ChevronLeft size={30} />
+            </button>
+          )}
+          <img src={list[lightboxIndex].dataUrl} alt="" className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg" onClick={e => e.stopPropagation()} />
+          {list.length > 1 && (
+            <button onClick={e => { e.stopPropagation(); setLightboxIndex(i => (i + 1) % list.length); }} className="absolute right-2 md:right-6 p-2" style={{ color: '#fff' }}>
+              <ChevronRight size={30} />
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {showDeletePhotosConfirm && createPortal(
+        <ConfirmSheet
+          isLargeScreen={isLargeScreen} t={t}
+          title={t.deleteSelectedPhotosConfirmTitle} desc={t.deleteSelectedPhotosConfirmDesc(selectedPhotoIds.length)}
+          onCancel={() => setShowDeletePhotosConfirm(false)} onConfirm={performDeleteSelectedPhotos}
+        />,
+        document.body
+      )}
+      {showDeleteAlbumConfirm && createPortal(
+        <ConfirmSheet
+          isLargeScreen={isLargeScreen} t={t}
+          title={t.deleteSelectedAlbumsConfirmTitle} desc={t.deleteSelectedAlbumsConfirmDesc(1)}
+          onCancel={() => setShowDeleteAlbumConfirm(false)} onConfirm={performDeleteAlbum}
+        />,
+        document.body
+      )}
+      {showEventPicker && (
+        <EventLinkPicker
+          events={events}
+          currentEventId={album.eventId}
+          t={t}
+          onClose={() => setShowEventPicker(false)}
+          onSelectNone={() => applyLinkEvent(null)}
+          onSelectEvent={id => applyLinkEvent(id)}
+          onCreateNew={() => { setShowEventPicker(false); setShowQuickEvent(true); }}
+        />
+      )}
+      {showQuickEvent && (
+        <QuickCreateEventSheet
+          t={t}
+          setEvents={setEvents}
+          onCancel={() => setShowQuickEvent(false)}
+          onCreated={id => { applyLinkEvent(id); setShowQuickEvent(false); }}
+        />
       )}
     </div>
   );
@@ -7022,6 +6947,34 @@ export default function App() {
   const isLargeScreen = useIsLargeScreen();
   const [viewingId, setViewingId] = useState(null);
 
+  // ---- 相冊（獨立一級功能） ----
+  // albums 是頂層清單（跟 events／clocks 同一層級），每筆相冊 {id, name, eventId, createdAt}——
+  // eventId 可以是 null（不關聯任何事件），相片本體仍然各自存在 album-photos:{id} 這個 key。
+  const [albums, setAlbums] = useState([]);
+  // albumRoute 決定相冊功能目前顯示哪個畫面（home／create／detail），提升到這一層而不是放在
+  // AlbumsFeature 元件自己的 state 裡，是因為手機版切到「相冊」分頁時該元件才會掛載，如果狀態
+  // 放在元件內部，每次切分頁都會被重置——而時間軸卡片上的「相冊」按鈕需要能直接指定「打開哪個
+  // 相冊的詳細頁」或「進入建立流程並預先帶入這個事件」，這個狀態必須跨分頁切換也不遺失。
+  const [albumRoute, setAlbumRoute] = useState({ screen: 'home', detailAlbumId: null, prefillEventId: null });
+  // 桌面／大螢幕版面沒有底部分頁列可以切到「相冊」，改用全螢幕覆蓋層顯示同一套相冊功能，
+  // 由時間軸卡片的「相冊」按鈕，或桌面頂端的相冊入口圖示觸發開啟。
+  const [albumsOverlayOpen, setAlbumsOverlayOpen] = useState(false);
+
+  // 時間軸卡片上「相冊」按鈕的共用邏輯：這個事件目前有沒有已經關聯的相冊——
+  // 完全沒有就直接進入「建立相冊」流程並預先帶入這個事件（使用者不用再選一次事件）；
+  // 已經有（可能不只一個）就直接跳進最近建立的那一個相冊詳細頁，不用先回相冊首頁再手動找。
+  function openAlbumsForEvent(eventId) {
+    const linked = albums.filter(a => a.eventId === eventId);
+    if (linked.length) {
+      const target = linked.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+      setAlbumRoute({ screen: 'detail', detailAlbumId: target.id, prefillEventId: null });
+    } else {
+      setAlbumRoute({ screen: 'create', detailAlbumId: null, prefillEventId: eventId });
+    }
+    if (isLargeScreen) setAlbumsOverlayOpen(true);
+    else setActiveTab('gallery');
+  }
+
   // File Handling API：使用者在作業系統裡直接用「開啟檔案」／雙擊 .tzzwnb 備份檔、
   // 或對著已安裝的 App 圖示把 .tzzwnb 檔拖進去時，瀏覽器會啟動這個 PWA 並把檔案透過
   // window.launchQueue 傳進來（不會經過任何 <input type="file">）。這裡用一個小提示條
@@ -7128,8 +7081,8 @@ export default function App() {
     mergeCheckedUidRef.current = fbUser.uid;
     (async () => {
       // 相片是「盡力而為」附帶上去，不影響底下 sameData 的比對邏輯（見下方說明）
-      const albumPhotos = await collectAllAlbumPhotos(events);
-      const localData = { clocks, events, lang, isDark, customIcons, ...(Object.keys(albumPhotos).length ? { albumPhotos } : {}) };
+      const albumPhotos = await collectAllAlbumPhotos(albums);
+      const localData = { clocks, events, lang, isDark, customIcons, albums, ...(Object.keys(albumPhotos).length ? { albumPhotos } : {}) };
       const hasLocalData = clocks.length > 0 || events.length > 0;
       let cloudData = null;
       try { cloudData = await loadCloudData(fbUser.uid); } catch (err) {}
@@ -7155,10 +7108,11 @@ export default function App() {
         setSyncStatus('synced');
         return;
       }
-      // 是否跳出合併提示，只看事件／時鐘骨架是否一致——相片同不同步是「加分項」，
-      // 不該讓使用者三不五時就被跳出來的合併視窗打斷。
-      const sameData = stableStringify({ clocks: cloudData.clocks || [], events: cloudData.events || [] })
-        === stableStringify({ clocks, events });
+      // 是否跳出合併提示，只看事件／時鐘／相冊骨架是否一致——相片同不同步是「加分項」，
+      // 不該讓使用者三不五時就被跳出來的合併視窗打斷。相冊用 resolveAlbumsField 統一解析，
+      // 這樣不管雲端存的是新格式（頂層 albums）還是舊格式（事件內嵌 albums）都能正確比對。
+      const sameData = stableStringify({ clocks: cloudData.clocks || [], events: cloudData.events || [], albums: resolveAlbumsField(cloudData) })
+        === stableStringify({ clocks, events, albums });
       if (sameData) {
         syncReadyRef.current = true;
         setSyncStatus('synced');
@@ -7174,6 +7128,9 @@ export default function App() {
     if (typeof data.lang === 'string' && LANGS.includes(data.lang)) setLang(data.lang);
     if (typeof data.isDark === 'boolean') setIsDark(data.isDark);
     if (Array.isArray(data.customIcons)) setCustomIcons(data.customIcons);
+    // 相冊：優先用資料裡明確帶的頂層 albums（新格式），並用 events 反推出的舊格式相冊補齊，
+    // 確保不管這份資料是新版本存的還是舊版本存的，相冊都不會憑空消失。
+    if (Array.isArray(data.events) || Array.isArray(data.albums)) setAlbums(resolveAlbumsField(data));
     // 相片同步是「盡力而為」：雲端資料如果帶著 albumPhotos，逐一寫回本機各自的
     // album-photos:{albumId} key；單一相冊寫入失敗就跳過那一個，不影響其他資料套用。
     if (data.albumPhotos && typeof data.albumPhotos === 'object') {
@@ -7244,6 +7201,7 @@ export default function App() {
         lang: local.lang,
         isDark: local.isDark,
         customIcons: Array.from(new Set([...(local.customIcons || []), ...(cloud.customIcons || [])])),
+        albums: mergeById(resolveAlbumsField(local), resolveAlbumsField(cloud)),
         albumPhotos: mergeAlbumPhotos(local.albumPhotos, cloud.albumPhotos),
       };
     }
@@ -7267,23 +7225,27 @@ export default function App() {
     if (!loaded || !fbUser || !syncReadyRef.current) return;
     setSyncStatus('syncing');
     const timer = setTimeout(async () => {
-      const albumPhotos = await collectAllAlbumPhotos(events);
+      const albumPhotos = await collectAllAlbumPhotos(albums);
       const photoSig = photoSigFromAlbumPhotos(albumPhotos);
       const photosChanged = photoSig !== lastSyncedPhotoSigRef.current;
-      const fullData = { clocks, events, lang, isDark, customIcons, ...(photosChanged ? { albumPhotos } : {}) };
+      const fullData = { clocks, events, lang, isDark, customIcons, albums, ...(photosChanged ? { albumPhotos } : {}) };
       const { ok, photosSynced } = await saveCloudDataBestEffort(fbUser.uid, fullData);
       if (photosSynced) lastSyncedPhotoSigRef.current = photoSig;
       setSyncStatus(ok ? 'synced' : 'error');
     }, 800);
     return () => clearTimeout(timer);
-  }, [clocks, events, lang, isDark, customIcons, fbUser, loaded]);
+  }, [clocks, events, lang, isDark, customIcons, albums, fbUser, loaded]);
 
 
   useEffect(() => {
     (async () => {
       try { const g = await window.storage.get(INVITE_KEY, false); if (g && g.value === 'true') setUnlocked(true); } catch (err) {}
-      try { const e = await window.storage.get(EVENTS_KEY, false); if (e && e.value) setEvents(JSON.parse(e.value)); } catch (err) {}
+      let loadedEventsRaw = [];
+      try { const e = await window.storage.get(EVENTS_KEY, false); if (e && e.value) { loadedEventsRaw = JSON.parse(e.value); setEvents(loadedEventsRaw); } } catch (err) {}
       try { const c = await window.storage.get(CLOCKS_KEY, false); if (c && c.value) setClocks(JSON.parse(c.value)); } catch (err) {}
+      let loadedAlbumsRaw = [];
+      try { const al = await window.storage.get(ALBUMS_KEY, false); if (al && al.value) loadedAlbumsRaw = JSON.parse(al.value); } catch (err) {}
+      setAlbums(resolveAlbumsField({ events: loadedEventsRaw, albums: loadedAlbumsRaw }));
       try { const l = await window.storage.get(LANG_KEY, false); if (l && l.value && LANGS.includes(l.value)) setLang(l.value); } catch (err) {}
       try { const d = await window.storage.get(DARK_KEY, false); if (d && d.value) setIsDark(d.value === 'true'); } catch (err) {}
       try { const ci = await window.storage.get(CUSTOM_ICONS_KEY, false); if (ci && ci.value) setCustomIcons(JSON.parse(ci.value)); } catch (err) {}
@@ -7297,6 +7259,7 @@ export default function App() {
   }, []);
 
   useEffect(() => { if (loaded) window.storage.set(EVENTS_KEY, JSON.stringify(events), false).then(() => setLocalSaveError(false)).catch(err => { console.error(err); setLocalSaveError(true); }); }, [events, loaded]);
+  useEffect(() => { if (loaded) window.storage.set(ALBUMS_KEY, JSON.stringify(albums), false).catch(err => console.error(err)); }, [albums, loaded]);
   useEffect(() => { if (loaded) window.storage.set(CLOCKS_KEY, JSON.stringify(clocks), false).catch(err => console.error(err)); }, [clocks, loaded]);
   useEffect(() => { if (loaded) window.storage.set(LANG_KEY, lang, false).catch(err => console.error(err)); }, [lang, loaded]);
   useEffect(() => { if (loaded) window.storage.set(DARK_KEY, String(isDark), false).catch(err => console.error(err)); }, [isDark, loaded]);
@@ -7642,6 +7605,15 @@ export default function App() {
           {isLargeScreen && (
             <div className="flex items-center gap-2">
               <button
+                onClick={() => { setAlbumRoute(prev => (prev.detailAlbumId || prev.screen !== 'home' ? prev : { screen: 'home', detailAlbumId: null, prefillEventId: null })); setAlbumsOverlayOpen(true); }}
+                className="flex items-center justify-center rounded-full flex-shrink-0"
+                style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}
+                title={t.navGallery}
+                aria-label={t.navGallery}
+              >
+                <Images size={16} />
+              </button>
+              <button
                 onClick={() => setShowAuthModal(true)}
                 className="relative flex items-center justify-center rounded-full flex-shrink-0"
                 style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: fbUser ? MINT : INK }}
@@ -7725,6 +7697,7 @@ export default function App() {
                 isLargeScreen
                 viewingId={viewingId}
                 setViewingId={setViewingId}
+                onOpenAlbumForEvent={openAlbumsForEvent}
               />
             </div>
           </main>
@@ -7767,6 +7740,7 @@ export default function App() {
                   onHeaderDragEnd={handleWorldClockDragEnd}
                   viewingId={viewingId}
                   setViewingId={setViewingId}
+                  onOpenAlbumForEvent={openAlbumsForEvent}
                 />
               </div>
 
@@ -7811,13 +7785,27 @@ export default function App() {
                       setCustomIcons={setCustomIcons}
                       viewingId={viewingId}
                       setViewingId={setViewingId}
+                      onOpenAlbumForEvent={openAlbumsForEvent}
                       layout="cards"
                     />
                   </div>
                 </div>
               )}
 
-              {activeTab === 'gallery' && <GalleryPage events={events} t={t} />}
+              {activeTab === 'gallery' && (
+                <AlbumsFeature
+                  events={events}
+                  setEvents={setEvents}
+                  albums={albums}
+                  setAlbums={setAlbums}
+                  route={albumRoute}
+                  setRoute={setAlbumRoute}
+                  lang={lang}
+                  t={t}
+                  isLargeScreen={isLargeScreen}
+                  onViewEvent={setViewingId}
+                />
+              )}
 
               {activeTab === 'profile' && (
                 <ProfilePage
@@ -7846,7 +7834,7 @@ export default function App() {
       {showAuthModal && (
         <AuthModal
           lang={lang} t={t} user={fbUser} onClose={() => setShowAuthModal(false)}
-          backupData={{ clocks, events, lang, isDark, customIcons }}
+          backupData={{ clocks, events, lang, isDark, customIcons, albums }}
           onImportBackup={applyCloudData}
         />
       )}
@@ -7854,6 +7842,33 @@ export default function App() {
         <FeedbackModal onClose={() => setShowFeedbackModal(false)} />
       )}
       {pendingMerge && <MergeDialog t={t} onResolve={resolveMerge} />}
+      {/* 大屏／桌面版沒有底部分頁列可以切到「相冊」，改用全螢幕覆蓋層顯示同一套相冊功能——
+          由時間軸卡片的「相冊」按鈕，或 Header 上的相冊入口圖示觸發開啟。 */}
+      {isLargeScreen && albumsOverlayOpen && createPortal(
+        <div className="fixed inset-0 flex flex-col" style={{ zIndex: 250, background: 'var(--app-bg, var(--card-bg))' }}>
+          <div className="px-6 md:px-10 py-5 flex items-center justify-between flex-shrink-0" style={{ borderBottom: CARD_BORDER }}>
+            <h1 className="text-xl font-black tracking-tight" style={{ color: INK }}>{t.navGallery}</h1>
+            <button onClick={() => setAlbumsOverlayOpen(false)} aria-label={t.close} className="flex items-center justify-center rounded-full" style={{ ...glass(), width: '2.125rem', height: '2.125rem', color: INK }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 md:px-10 py-5 max-w-[900px] mx-auto w-full flex flex-col">
+            <AlbumsFeature
+              events={events}
+              setEvents={setEvents}
+              albums={albums}
+              setAlbums={setAlbums}
+              route={albumRoute}
+              setRoute={setAlbumRoute}
+              lang={lang}
+              t={t}
+              isLargeScreen={isLargeScreen}
+              onViewEvent={setViewingId}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
       {fileHandlerMsg && (
         <div
           className="fixed left-1/2 px-4 py-3 rounded-xl text-sm font-bold text-center shadow-lg"
